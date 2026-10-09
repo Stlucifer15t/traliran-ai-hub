@@ -111,6 +111,37 @@ docker run -d -p 8080:80 traliran-ai-hub
 Open http://localhost:8080 in your browser.
 
    
+## 📱 Android build & mobile IDE (fork changes)
+
+This fork packages the same static app as an Android APK with [Capacitor](https://capacitorjs.com) and adds a phone-friendly IDE. The web app still runs from the repo root with no build step (GitHub Pages, Docker); the Capacitor bundle is generated into `www/`.
+
+**Build the APK**
+
+```bash
+npm ci
+npm run build        # bundles vendor/ and writes www/
+npm run cap:sync     # copies www/ into android/
+cd android && ./gradlew assembleDebug
+```
+
+CI builds the debug APK on every push (`.github/workflows`, Android APK workflow). Monaco (about 13 MB) is never committed; `www/` gets it at package time only.
+
+**What changed**
+
+- **Native shell:** CAMERA permission, app icon and splash screen, Android back button (closes panes first), `anthropic-dangerous-direct-browser-access` header on Anthropic requests, downloads through Capacitor Filesystem and Share, and inline previews on phones instead of `window.open` blob URLs.
+- **Local models:** LAN endpoint entry for Ollama and llama.cpp, cleartext HTTP and mixed-content settings for LAN use, and an `OLLAMA_ORIGINS` setup hint.
+- **Phone IDE:** one pane at a time (Chat, Files, Code, Preview) with bottom tabs and swipe. CodeMirror 6 replaces Monaco on phones, with a symbol row (`{ } ( ) ; = < > Tab`).
+- **AI change review:** each AI edit shows a per-file diff with Accept and Reject, plus one-tap undo.
+- **Preview:** auto-refresh after AI changes for web files, console and error panel, and a "Fix this error" button that sends the error to the agent.
+- **Agent tools:** plan mode (the agent lists steps and waits for approval), `@file` mentions and pinned files as context, prompt templates, project presets (landing page, game, tool, PWA), screenshot-to-code, voice input, and "continue" for truncated output.
+- **Models and cost:** a cheaper model for edits and a stronger one for planning, with a token and cost counter. Streaming with a Stop button.
+- **Reliability:** partial replies are autosaved, and messages that fail on a dropped connection go into an offline queue and are retried. Note that a remote stream cannot be resumed; the partial text is kept and the message is retried.
+- **Security:** API keys are encrypted at rest. Exports strip keys by default; including them is an explicit opt-in.
+
+**Status:** the Android build runs in CI. Device behaviour (WebView quirks, local model access over LAN, voice on Android) has not yet been verified on hardware.
+
+**Credits and licence:** all original authors, the LICENSE (AGPL-3.0), and the Assistant Store are kept as they were. Source for any modified version you distribute or host must remain available under AGPL-3.0.
+
 ## ⚖️ License & Open Source Terms
 
 This project is licensed under the **GNU Affero General Public License v3.0 (AGPLv3)**.
