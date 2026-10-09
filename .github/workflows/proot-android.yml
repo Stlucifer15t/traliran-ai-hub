@@ -35,14 +35,22 @@ jobs:
 
       - name: Ensure talloc.h is available
         run: |
-          set -euo pipefail
-          if find talloc -name talloc.h | grep -q .; then
-            echo "talloc.h found in the Termux package"
+          set -uo pipefail
+          HDR="$(find talloc -name talloc.h 2>/dev/null | head -1)"
+          if [ -n "$HDR" ]; then
+            echo "talloc.h found in the Termux package: $HDR"
           else
-            echo "talloc.h not in the Termux package; taking it from the upstream talloc release"
-            curl -fsSL https://www.samba.org/ftp/talloc/talloc-2.4.2.tar.gz -o talloc.tgz
-            tar -xzf talloc.tgz talloc-2.4.2/talloc.h
-            mkdir -p talloc-include && cp talloc-2.4.2/talloc.h talloc-include/
+            echo "talloc.h not in the Termux package; fetching the upstream talloc release"
+            URL=https://www.samba.org/ftp/talloc/talloc-2.4.2.tar.gz
+            HTTP=$(curl -sSL -o talloc.tgz -w '%{http_code}' "$URL" || true)
+            echo "download HTTP status: $HTTP"
+            ls -la talloc.tgz || { echo "download failed"; exit 1; }
+            echo "archive members that end in talloc.h:"
+            tar -tzf talloc.tgz | grep 'talloc\.h$' || true
+            MEMBER="$(tar -tzf talloc.tgz | grep '/talloc\.h$' | head -1)"
+            mkdir -p talloc-include
+            tar -xzf talloc.tgz -C talloc-include "$MEMBER"
+            cp "talloc-include/$MEMBER" talloc-include/talloc.h
           fi
           find talloc talloc-include -name talloc.h 2>/dev/null
 
