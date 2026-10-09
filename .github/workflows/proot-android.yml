@@ -44,6 +44,13 @@ jobs:
           # Listing is informational only. find exits non-zero when a path is missing.
           find talloc talloc-include -name talloc.h 2>/dev/null || true
 
+      - name: Install aarch64 binutils (the NDK ships only llvm-objcopy)
+        run: |
+          set -euo pipefail
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq binutils-aarch64-linux-gnu
+          aarch64-linux-gnu-objcopy --version | head -1
+
       - name: Build proot and loader with the NDK
         run: |
           set -euo pipefail
@@ -61,7 +68,7 @@ jobs:
           sed -i '1i #include <string.h>' proot/src/extension/ashmem_memfd/ashmem_memfd.c
           cd proot/src
           make clean >/dev/null 2>&1 || true
-          make -j"$(nproc)" CC="$NDK_BIN/aarch64-linux-android24-clang" STRIP="$NDK_BIN/llvm-strip" OBJCOPY="$NDK_BIN/llvm-objcopy" proot loader/loader
+          make -j"$(nproc)" CC="$NDK_BIN/aarch64-linux-android24-clang" STRIP="$NDK_BIN/llvm-strip" OBJCOPY=aarch64-linux-gnu-objcopy OBJDUMP=aarch64-linux-gnu-objdump proot loader/loader
           ls -la proot loader/loader
           cp proot ../../out/libproot.so
           cp loader/loader ../../out/libproot-loader.so
