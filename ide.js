@@ -713,7 +713,7 @@ const MONACO = {
                 return;
             }
             
-            require.config({ paths: { vs: 'https://cdnjs.cloudflare.com/ajax/libs/monaco-editor/0.44.0/min/vs' } });
+            require.config({ paths: { vs: window.__MONACO_CDN ? 'https://cdnjs.cloudflare.com/ajax/libs/monaco-editor/0.44.0/min/vs' : 'vendor/monaco/vs' } });
             
             require(['vs/editor/editor.main'], () => {
                 console.log('[MONACO] Loaded');

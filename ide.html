@@ -5,9 +5,9 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
     <meta name="theme-color" content="#000000">
     <title>Traliran AI IDE - Serverless Code Editor</title>
-    <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
-    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/monaco-editor/0.44.0/min/vs/loader.min.js"></script>
+    <script src="vendor/marked.umd.js"></script>
+    <script src="vendor/monaco/vs/loader.js" onerror="window.__MONACO_CDN=true;var s=document.createElement('script');s.src='https://cdnjs.cloudflare.com/ajax/libs/monaco-editor/0.44.0/min/vs/loader.min.js';document.head.appendChild(s);"></script>
+    <link rel="stylesheet" href="vendor/tailwind.css">
     <link rel="stylesheet" href="styles.css">
     <style>
         #monacoContainer { height: 100%; width: 100%; }

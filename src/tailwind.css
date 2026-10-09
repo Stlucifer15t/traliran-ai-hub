@@ -1,0 +1,10 @@
+/* Compiled Tailwind (replaces the runtime @tailwindcss/browser CDN build).
+   Every class used in the app must appear literally in one of the scanned
+   sources, or be listed in @source inline() below. */
+@import "tailwindcss";
+
+@source "../*.html";
+@source "../*.js";
+
+/* Classes assembled at runtime (string concatenation) must be listed here. */
+@source inline("bg-emerald-400 bg-emerald-500 bg-amber-400 bg-red-500 bg-blue-500 text-emerald-400 text-amber-400 text-red-400 text-blue-400");
