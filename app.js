@@ -578,8 +578,21 @@ function handleProviderChange(provider) {
     }
     apiEndpoint.value = STORAGE.getItem(`gem_endpoint_${provider}`) || details.url;
     apiKeyValue.value = STORAGE.getItem(`gem_key_${provider}`) || '';
+    updateLocalHint(provider);
     selectedMultiModels = [];
     updateMultiModelUI();
+}
+
+// Setup hint for Ollama / llama.cpp (local backends) and the phone-localhost warning.
+function updateLocalHint(provider) {
+    const hint = document.getElementById('localBackendHint');
+    if (!hint) return;
+    const details = PROVIDERS[provider] || {};
+    hint.classList.toggle('hidden', !!details.hasKey);
+    const warning = document.getElementById('localBackendWarning');
+    const msg = HubPlatform.localEndpointWarning(apiEndpoint.value);
+    warning.textContent = msg;
+    warning.classList.toggle('hidden', !msg);
 }
 
 function getProviderConfig(providerName) {
@@ -2114,7 +2127,12 @@ apiProvider.addEventListener('change', (e) => {
 });
 apiKeyValue.addEventListener('input', () => { saveApiSettings(); });
 apiKeyValue.addEventListener('change', () => { fetchActiveModels(); });
-apiEndpoint.addEventListener('input', () => { saveApiSettings(); });
+apiEndpoint.addEventListener('input', () => { saveApiSettings(); updateLocalHint(apiProvider.value); });
+apiEndpoint.addEventListener('change', () => {
+    apiEndpoint.value = HubPlatform.normalizeEndpoint(apiEndpoint.value);
+    saveApiSettings();
+    updateLocalHint(apiProvider.value);
+});
 apiEndpoint.addEventListener('change', () => { fetchActiveModels(); });
 botNameInput.addEventListener('input', saveApiSettings);
 botPromptInput.addEventListener('input', saveApiSettings);

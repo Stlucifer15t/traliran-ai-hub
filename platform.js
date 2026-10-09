@@ -106,7 +106,28 @@
         return { ok: true };
     }
 
+    /** Trims, adds http:// when no scheme is given, and drops trailing slashes. */
+    function normalizeEndpoint(url) {
+        let v = String(url || '').trim();
+        if (v && !/^https?:\/\//i.test(v)) v = 'http://' + v;
+        return v.replace(/\/+$/, '');
+    }
+
+    /** On a phone, localhost is the phone itself: explain that when it is used. */
+    function localEndpointWarning(url) {
+        if (!isMobile) return '';
+        try {
+            const host = new URL(normalizeEndpoint(url)).hostname;
+            if (['localhost', '127.0.0.1', '[::1]', '::1'].indexOf(host) !== -1) {
+                return 'On this phone, localhost is the phone itself. Enter your computer\'s LAN address, e.g. http://192.168.1.20:11434/v1';
+            }
+        } catch (e) { /* incomplete URL while typing */ }
+        return '';
+    }
+
     window.HubPlatform = {
+        normalizeEndpoint,
+        localEndpointWarning,
         isNative,
         isMobile,
         anthropicHeaders,

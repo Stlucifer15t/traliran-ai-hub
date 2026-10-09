@@ -164,6 +164,13 @@
                         class="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-emerald-500 transition font-mono">
                 </div>
 
+                <div id="localBackendHint" class="hidden bg-gray-950 p-3 rounded-lg border border-gray-800 text-xs space-y-1.5">
+                    <p id="localBackendWarning" class="hidden text-amber-300 font-semibold"></p>
+                    <p class="text-gray-400">Phone or other device: <code>localhost</code> means that device. Use your computer's LAN address on the same Wi-Fi, e.g. <code>http://192.168.1.20:11434/v1</code>.</p>
+                    <p class="text-gray-400"><strong class="text-gray-200">Ollama:</strong> start it with <code>OLLAMA_HOST=0.0.0.0</code> and <code>OLLAMA_ORIGINS=https://localhost</code> (or <code>*</code> on a trusted LAN), then restart it.</p>
+                    <p class="text-gray-400"><strong class="text-gray-200">llama.cpp:</strong> run <code>llama-server --host 0.0.0.0 --port 8080</code>. If the app reports a CORS error, check the server's CORS settings.</p>
+                </div>
+
                 <button id="refreshModelsBtn" class="w-full bg-gray-800 hover:bg-gray-700 text-gray-200 font-semibold py-2 rounded-xl text-xs transition cursor-pointer flex items-center justify-center gap-1"><svg class="svg-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M23 4v6h-6M1 20v-6h6"/><path d="M3.51 9a9 9 0 0114.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0020.49 15"/></svg>
                     Refresh Model List
                 </button>
