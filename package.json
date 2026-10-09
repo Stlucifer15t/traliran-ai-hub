@@ -10,7 +10,8 @@
     "build:www": "node scripts/build-www.mjs",
     "build": "npm run build:vendor && npm run build:www",
     "cap:sync": "npm run build && npx cap sync android",
-    "android:debug": "npm run cap:sync && cd android && ./gradlew assembleDebug"
+    "android:debug": "npm run cap:sync && cd android && ./gradlew assembleDebug",
+    "test": "node --test tests/*.test.mjs"
   },
   "dependencies": {
     "@capacitor-community/speech-recognition": "^7.0.1",
