@@ -127,11 +127,7 @@ function convertContentForAnthropic(content) {
 async function fetchSingleCompletion(endpoint, apiKey, hasKey, bodyPayload, providerName, signal) {
     const provider = PROVIDERS[providerName] || PROVIDERS.openai;
     if (provider.type === 'anthropic') {
-        const headers = {
-            'Content-Type': 'application/json',
-            'x-api-key': apiKey,
-            'anthropic-version': '2023-06-01'
-        };
+        const headers = HubPlatform.anthropicHeaders(apiKey);
 
         const systemMessage = bodyPayload.messages.find(msg => msg.role === 'system');
         const anthropicPayload = {
@@ -1364,11 +1360,7 @@ If no tool is needed, just respond normally with your answer.`;
             // Handle Anthropic (Claude) separately
             if (providerConfig?.type === 'anthropic') {
                 console.log('[AI TOOL CALL] Using Anthropic API');
-                const headers = {
-                    'Content-Type': 'application/json',
-                    'x-api-key': apiKey,
-                    'anthropic-version': '2023-06-01'
-                };
+                const headers = HubPlatform.anthropicHeaders(apiKey);
 
                 const systemMessage = messages.find(msg => msg.role === 'system');
                 const userMessages = messages.filter(msg => msg.role !== 'system').map(msg => ({
@@ -1818,17 +1810,9 @@ async function deleteBot() {
     renderBotStore();
 }
 
-function exportBots() {
+async function exportBots() {
     const json = JSON.stringify(customBots, null, 2);
-    const blob = new Blob([json], { type: 'application/json' });
-    const url = URL.createObjectURL(blob);
-    
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = 'traliran-ide-bots.json';
-    a.click();
-    
-    URL.revokeObjectURL(url);
+    await HubPlatform.saveFile(json, 'traliran-ide-bots.json', 'application/json');
 }
 
 function importBots(event) {
@@ -2176,8 +2160,22 @@ const PREVIEW = {
         return htmlContent;
     },
 
-    // Open preview in a separate browser tab.
-    openInNewTab() {
+    // Mobile / Android WebView: window.open() does nothing, so the preview is
+    // always inline. "Open in New Tab" becomes a share of the built HTML file.
+    showInline() {
+        this.isVisible = true;
+        previewPanel.classList.remove('hidden');
+        this.render();
+    },
+
+    // Open preview in a separate browser tab (desktop) or inline (mobile).
+    async openInNewTab() {
+        if (window.HubPlatform && HubPlatform.isMobile) {
+            const html = this.buildHtml();
+            if (!html) { notifyWarning('No HTML file to preview.'); return; }
+            this.showInline();
+            return;
+        }
         const htmlContent = this.buildHtml();
         if (!htmlContent) {
             notifyWarning('No HTML file to preview.');
@@ -2212,9 +2210,8 @@ const PREVIEW = {
             return;
         }
 
-        // Render in iframe
-        const blob = new Blob([htmlContent], { type: 'text/html' });
-        previewFrame.src = URL.createObjectURL(blob);
+        // srcdoc instead of a blob: URL (blob iframes are unreliable in some WebViews).
+        previewFrame.srcdoc = htmlContent;
     }
 };
 
@@ -2825,7 +2822,15 @@ async function init() {
     
     // Preview (opens in a separate browser tab; inline panel kept as fallback)
     togglePreviewBtn.onclick = () => PREVIEW.openInNewTab();
-    if (openPreviewTabBtn) openPreviewTabBtn.onclick = () => PREVIEW.openInNewTab();
+    if (openPreviewTabBtn) openPreviewTabBtn.onclick = () => {
+        if (window.HubPlatform && HubPlatform.isMobile) {
+            const html = PREVIEW.buildHtml();
+            if (html) HubPlatform.saveFile(html, 'preview.html', 'text/html');
+            else notifyWarning('No HTML file to preview.');
+            return;
+        }
+        PREVIEW.openInNewTab();
+    };
     closePreviewBtn.onclick = () => PREVIEW.toggle();
 
     // Agentic-only view (chat without editor)

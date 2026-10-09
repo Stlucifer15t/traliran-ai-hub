@@ -1254,21 +1254,13 @@ noteFileInput.addEventListener('change', async (e) => {
     noteFileInput.value = '';
 });
 
-function exportNoteToMD() {
+async function exportNoteToMD() {
     if (!currentNoteId) return;
     const note = notes.find(n => n.id === currentNoteId);
     if (!note) return;
     const title = note.title || 'untitled-note';
     const content = `# ${note.title}\n\n${note.content}`;
-    const blob = new Blob([content], { type: 'text/markdown' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `${title}.md`;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    URL.revokeObjectURL(url);
+    await HubPlatform.saveFile(content, `${title}.md`, 'text/markdown');
 }
 
 function loadRagKnowledgeBase() {
@@ -1593,11 +1585,7 @@ function convertContentForAnthropic(content) {
 async function fetchSingleCompletion(endpoint, apiKey, hasKey, bodyPayload, providerName, signal) {
     const provider = PROVIDERS[providerName] || PROVIDERS.openai;
     if (provider.type === 'anthropic') {
-        const headers = {
-            'Content-Type': 'application/json',
-            'x-api-key': apiKey,
-            'anthropic-version': '2023-06-01'
-        };
+        const headers = HubPlatform.anthropicHeaders(apiKey);
 
         const systemMessage = bodyPayload.messages.find(msg => msg.role === 'system');
         const anthropicPayload = {
@@ -1721,7 +1709,7 @@ async function fetchAnthropicWithTools(endpoint, apiKey, modelId, conv, tools, m
         top_p: topP
     };
 
-    const headers = { 'Content-Type': 'application/json', 'x-api-key': apiKey, 'anthropic-version': '2023-06-01' };
+    const headers = HubPlatform.anthropicHeaders(apiKey);
     const response = await fetch(`${endpoint}/messages`, { method: 'POST', headers, body: JSON.stringify(body), signal });
     if (!response.ok) {
         const errJson = await response.json().catch(() => ({}));
@@ -2481,7 +2469,7 @@ importNoteBtn.addEventListener('click', importNoteFromMD);
 exportToRagBtn.addEventListener('click', exportNoteToRAG);
 exportNoteBtn.addEventListener('click', exportNoteToMD);
 
-exportJsonBtn.addEventListener('click', () => {
+exportJsonBtn.addEventListener('click', async () => {
     const config = {
         provider: apiProvider.value,
         apiKey: apiKeyValue.value.trim(),
@@ -2494,13 +2482,8 @@ exportJsonBtn.addEventListener('click', () => {
         topP: parseFloat(topPInput.value),
         maxTokens: getMaxTokens()
     };
-    const dataStr = 'data:text/json;charset=utf-8,' + encodeURIComponent(JSON.stringify(config, null, 2));
-    const downloadAnchor = document.createElement('a');
-    downloadAnchor.setAttribute('href', dataStr);
-    downloadAnchor.setAttribute('download', config.botName ? `config-${config.botName.toLowerCase().replace(/\s+/g, '-')}.json` : 'hub-config.json');
-    document.body.appendChild(downloadAnchor);
-    downloadAnchor.click();
-    downloadAnchor.remove();
+    const fileName = config.botName ? `config-${config.botName.toLowerCase().replace(/\s+/g, '-')}.json` : 'hub-config.json';
+    await HubPlatform.saveFile(JSON.stringify(config, null, 2), fileName, 'application/json');
 });
 
 importJsonInput.addEventListener('change', (e) => {

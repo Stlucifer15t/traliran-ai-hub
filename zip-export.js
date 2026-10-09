@@ -304,14 +304,10 @@
     }
 
     function downloadBlob(blob, filename) {
-        var url = URL.createObjectURL(blob);
-        var link = document.createElement('a');
-        link.href = url;
-        link.download = filename;
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
-        setTimeout(function () { URL.revokeObjectURL(url); }, 5000);
+        // Routes through Capacitor Filesystem + Share on Android; <a download> on web.
+        return window.HubPlatform
+            ? window.HubPlatform.saveFile(blob, filename, 'application/zip')
+            : Promise.resolve(null);
     }
 
     function fail(message) {
@@ -365,7 +361,7 @@
 
             var bytes = buildZip(entries);
             var blob = new Blob([bytes], { type: 'application/zip' });
-            downloadBlob(blob, sanitizeRepoName(repo.repoName) + '.zip');
+            await downloadBlob(blob, sanitizeRepoName(repo.repoName) + '.zip');
             done('Repository exported as ZIP.');
         } catch (e) {
             fail('Failed to export ZIP: ' + (e && e.message ? e.message : e));
