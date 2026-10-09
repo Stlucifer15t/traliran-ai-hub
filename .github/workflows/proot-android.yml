@@ -33,12 +33,25 @@ jobs:
           tar -xf data.tar.* 
           find . -name 'libtalloc.so*' -o -name 'talloc.h' | head
 
+      - name: Ensure talloc.h is available
+        run: |
+          set -euo pipefail
+          if find talloc -name talloc.h | grep -q .; then
+            echo "talloc.h found in the Termux package"
+          else
+            echo "talloc.h not in the Termux package; taking it from the upstream talloc release"
+            curl -fsSL https://www.samba.org/ftp/talloc/talloc-2.4.2.tar.gz -o talloc.tgz
+            tar -xzf talloc.tgz talloc-2.4.2/talloc.h
+            mkdir -p talloc-include && cp talloc-2.4.2/talloc.h talloc-include/
+          fi
+          find talloc talloc-include -name talloc.h 2>/dev/null
+
       - name: Build proot and loader with the NDK
         run: |
           set -euo pipefail
           NDK_BIN="$ANDROID_NDK_HOME/toolchains/llvm/prebuilt/linux-x86_64/bin"
           TALLOC_LIB="$(find talloc -name 'libtalloc.so' | head -1)"
-          TALLOC_INC="$(dirname "$(find talloc -name talloc.h | head -1)")"
+          TALLOC_INC="$(dirname "$(find talloc talloc-include -name talloc.h | head -1)")"
           mkdir -p out
           cp "$TALLOC_LIB" out/libtalloc.so
           # Set CFLAGS/LDFLAGS in the environment, not on the make command line:
