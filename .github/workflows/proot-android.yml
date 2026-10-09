@@ -1,10 +1,13 @@
 # Builds proot (ptrace-based chroot-like runner) for Android arm64 from the Termux source.
-# Manual only (workflow_dispatch) while the native build is being brought up.
+# Runs when this file changes on the session branch (and by hand from the Actions tab).
 # Output: an artifact with libproot.so, libproot-loader.so and libtalloc.so for jniLibs/arm64-v8a.
 name: proot (Android arm64)
 
 on:
   workflow_dispatch:
+  push:
+    branches: [arena/8bf451fb-traliran-ai-hub]
+    paths: ['.github/workflows/proot-android.yml']
 
 permissions:
   contents: read
