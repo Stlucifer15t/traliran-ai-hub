@@ -1,0 +1,57 @@
+# Builds proot (ptrace-based chroot-like runner) for Android arm64 from the Termux source.
+# Manual only (workflow_dispatch) while the native build is being brought up.
+# Output: an artifact with libproot.so, libproot-loader.so and libtalloc.so for jniLibs/arm64-v8a.
+name: proot (Android arm64)
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    steps:
+      - name: Fetch proot source (Termux fork)
+        run: git clone --depth 1 https://github.com/termux/proot.git proot
+
+      - name: Fetch libtalloc for aarch64 from the Termux repo
+        run: |
+          set -euo pipefail
+          BASE=https://packages.termux.dev/apt/termux-main
+          curl -fsSL "$BASE/dists/stable/main/binary-aarch64/Packages" -o Packages
+          FILE=$(awk '/^Package: libtalloc$/{f=1} f&&/^Filename:/{print $2; exit}' Packages)
+          echo "talloc package: $FILE"
+          curl -fsSL "$BASE/$FILE" -o libtalloc.deb
+          mkdir talloc && cd talloc
+          ar x ../libtalloc.deb
+          tar -xf data.tar.* 
+          find . -name 'libtalloc.so*' -o -name 'talloc.h' | head
+
+      - name: Build proot and loader with the NDK
+        run: |
+          set -euo pipefail
+          NDK_BIN="$ANDROID_NDK_HOME/toolchains/llvm/prebuilt/linux-x86_64/bin"
+          TALLOC_DIR="$PWD/talloc/data/data/com.termux/files/usr"
+          TALLOC_LIB="$(find talloc -name 'libtalloc.so' | head -1)"
+          TALLOC_INC="$(dirname "$(find talloc -name talloc.h | head -1)")"
+          mkdir -p out
+          cp "$TALLOC_LIB" out/libtalloc.so
+          cd proot/src
+          make clean >/dev/null 2>&1 || true
+          make -j"$(nproc)" \
+            CC="$NDK_BIN/aarch64-linux-android24-clang" \
+            CFLAGS="-I$TALLOC_INC -O2 -fPIE" \
+            LDFLAGS="-L$PWD/../../out -ltalloc -pie -Wl,-rpath,'\$ORIGIN' -Wl,-rpath-link=$PWD/../../out"
+          ls -la proot loader 2>/dev/null || find . -maxdepth 2 -name 'proot*' -type f
+          cp proot ../../out/libproot.so
+          cp loader ../../out/libproot-loader.so
+          cd ../.. && ls -la out
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: proot-android-arm64
+          path: out/
+          if-no-files-found: error
