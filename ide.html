@@ -118,6 +118,8 @@
                 <button id="agenticModeBtn" class="bg-violet-600 hover:bg-violet-700 text-white text-xs px-3 py-1.5 rounded-2xl transition" title="Show agent chat only">
                     Agentic Only
                 </button>
+                <button id="pinFileBtn" class="bg-gray-800 hover:bg-gray-700 text-gray-200 text-xs px-3 py-1.5 rounded-2xl transition" title="Pin the active file as AI context">Pin</button>
+                <button id="presetsBtn" class="bg-gray-800 hover:bg-gray-700 text-gray-200 text-xs px-3 py-1.5 rounded-2xl transition" title="Start a project from a preset">Presets</button>
                 <button id="newFileBtn" class="bg-emerald-600 hover:bg-emerald-700 text-white text-xs px-3 py-1.5 rounded-2xl transition" title="New File">
                     New File
                 </button>
@@ -212,12 +214,16 @@
             </div>
             
             <!-- Monaco Editor -->
-            <div class="flex-1 relative">
+            <div id="editorWrap" class="flex-1 relative">
                 <div id="monacoContainer" class="absolute inset-0"></div>
+                <div id="cmContainer" class="hidden absolute inset-0"></div>
             </div>
 
+            <!-- Mobile symbol row (phones only, above the soft keyboard) -->
+            <div id="mobileSymbolBar" class="mobile-symbol-bar hidden"></div>
+
             <!-- Live Preview Panel (collapsible, kept for inline view) -->
-            <div id="previewPanel" class="hidden h-64 border-t border-gray-800 bg-gray-950">
+            <div id="previewPanel" class="hidden h-64 border-t border-gray-800 bg-gray-950 flex flex-col min-h-0">
                 <div class="flex justify-between items-center px-3 py-1.5 bg-gray-900 border-b border-gray-800">
                     <span class="text-xs font-bold text-gray-400">Live Preview</span>
                     <div class="flex items-center gap-2">
@@ -225,7 +231,14 @@
                         <button id="closePreviewBtn" class="text-gray-400 hover:text-white text-xs">✕ Close</button>
                     </div>
                 </div>
-                <iframe id="previewFrame" class="w-full h-[calc(100%-32px)] border-0 bg-white"></iframe>
+                <iframe id="previewFrame" class="w-full flex-1 min-h-0 border-0 bg-white"></iframe>
+                <div id="previewConsole" class="h-32 shrink-0 border-t border-gray-800 flex flex-col bg-black">
+                    <div class="flex items-center justify-between px-2 py-1 text-[11px] text-gray-400 bg-gray-900">
+                        <span>Console <span id="consoleErrorBadge" class="hidden ml-1 bg-rose-600 text-white rounded px-1.5"></span></span>
+                        <button id="consoleClearBtn" type="button" class="hover:text-white">Clear</button>
+                    </div>
+                    <div id="consoleList" class="flex-1 min-h-0 overflow-y-auto p-1 space-y-0.5"></div>
+                </div>
             </div>
         </section>
 
@@ -270,6 +283,7 @@
                 </div>
 
                 <!-- Input Area -->
+                <input type="file" id="screenshotInput" accept="image/*" capture="environment" class="hidden">
                 <div id="agentInputArea" class="p-3 border-t border-gray-800 bg-gray-900">
                     <div id="agentFileIndicator" class="hidden items-center justify-between gap-2 bg-gray-800/80 border border-gray-700 px-3 py-1.5 rounded-lg text-xs mb-2">
                         <div class="flex items-center gap-2 text-violet-300 truncate min-w-0">
@@ -278,8 +292,21 @@
                         </div>
                         <button id="removeAgentFileBtn" class="text-rose-400 hover:text-rose-300 cursor-pointer px-1 font-bold shrink-0" aria-label="Remove attachment">Remove</button>
                     </div>
-                    <textarea id="agentInput" rows="3" placeholder="Describe what you want to build or change..." 
+                    <div id="agentToolbar" class="flex flex-wrap gap-1.5 mb-2">
+                        <button id="undoAiBtn" type="button" class="text-[11px] px-2.5 py-1 rounded-full bg-gray-800 text-gray-200 border border-gray-700 disabled:opacity-40">↶ Undo AI change <span data-undo-count class="text-violet-300"></span></button>
+                        <label class="text-[11px] px-2.5 py-1 rounded-full bg-gray-800 text-gray-200 border border-gray-700 cursor-pointer flex items-center gap-1"><input type="checkbox" id="planModeToggle" class="accent-violet-500"> Plan first</label>
+                        <button id="templatesBtn" type="button" class="text-[11px] px-2.5 py-1 rounded-full bg-gray-800 text-gray-200 border border-gray-700">Templates</button>
+                        <button id="voiceBtn" type="button" class="text-[11px] px-2.5 py-1 rounded-full bg-gray-800 text-gray-200 border border-gray-700">🎤 Voice</button>
+                        <button id="screenshotBtn" type="button" class="text-[11px] px-2.5 py-1 rounded-full bg-gray-800 text-gray-200 border border-gray-700">📷 Screenshot → code</button>
+                        <button id="continueBtn" type="button" class="hidden text-[11px] px-2.5 py-1 rounded-full bg-violet-700 text-white">Continue</button>
+                    </div>
+                    <div id="pinnedBar" class="hidden flex flex-wrap gap-1 mb-2"></div>
+                    <div class="relative">
+                        <div id="templatesMenu" class="hidden absolute bottom-full left-0 mb-1 w-full max-h-56 overflow-y-auto bg-gray-900 border border-gray-700 rounded-xl shadow-xl z-50"></div>
+                        <div id="mentionMenu" class="hidden absolute bottom-full left-0 right-0 mb-1 max-h-48 overflow-y-auto bg-gray-900 border border-gray-700 rounded-xl shadow-xl z-50"></div>
+                        <textarea id="agentInput" rows="3" placeholder="Describe what you want to build or change..." 
                         class="w-full bg-gray-800 border border-gray-700 rounded-2xl px-3 py-2 text-sm focus:border-violet-500 focus:outline-none resize-none"></textarea>
+                    </div>
                     <div class="flex gap-2 mt-2">
                         <label class="bg-gray-800 hover:bg-gray-700 border border-gray-700 text-gray-200 px-3 py-2 rounded-2xl transition cursor-pointer flex items-center justify-center shrink-0" title="Attach an image for the AI">
                             <svg class="svg-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21.44 11.05l-9.19 9.19a6 6 0 01-8.49-8.49l9.19-9.19a4 4 0 015.66 5.66l-9.2 9.19a2 2 0 01-2.83-2.83l8.49-8.48"/></svg>
@@ -309,6 +336,17 @@
                 <div class="bg-blue-900/30 border border-blue-800 rounded p-3">
                     <h4 class="text-blue-400 text-xs font-bold uppercase mb-1">Configuration Source</h4>
                     <p class="text-gray-400 text-xs">Settings are loaded from the main Hub if available. You can override them here specifically for this IDE session.</p>
+                </div>
+                <div class="bg-gray-950 border border-gray-800 rounded-xl p-3 space-y-3">
+                    <h4 class="text-xs font-bold uppercase text-gray-400">Model routing</h4>
+                    <p class="text-[11px] text-gray-500">A strong model plans and a cheap model edits. Leave blank to use the main model for both.</p>
+                    <label class="block text-xs text-gray-400">Planning model
+                        <input id="planModelInput" type="text" placeholder="e.g. claude-sonnet-4-5" class="mt-1 w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm font-mono focus:outline-none focus:border-violet-500">
+                    </label>
+                    <label class="block text-xs text-gray-400">Editing model
+                        <input id="editModelInput" type="text" placeholder="e.g. gpt-4o-mini" class="mt-1 w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm font-mono focus:outline-none focus:border-violet-500">
+                    </label>
+                    <label class="flex items-center gap-2 text-xs text-gray-300"><input type="checkbox" id="autoPreviewToggle" class="accent-violet-500" checked> Auto-preview after AI changes</label>
                 </div>
 
                 <div>
@@ -352,6 +390,14 @@
             </div>
         </aside>
     </main>
+
+    <!-- Phone / tablet pane switcher (hidden on desktop; swipe left or right to change pane) -->
+    <nav id="mobileTabs" class="hidden shrink-0 bg-gray-900 border-t border-gray-800 grid grid-cols-4" aria-label="IDE panes">
+        <button type="button" data-mtab-btn="chat" class="mtab">Chat</button>
+        <button type="button" data-mtab-btn="files" class="mtab">Files</button>
+        <button type="button" data-mtab-btn="code" class="mtab">Code</button>
+        <button type="button" data-mtab-btn="preview" class="mtab">Preview<span id="mtabErrorBadge" class="hidden ml-1 bg-rose-600 text-white rounded px-1 text-[10px]"></span></button>
+    </nav>
 
     <!-- Bot Store Modal -->
     <div id="botStoreModal" class="hidden fixed inset-0 bg-black/80 z-50 flex items-center justify-center p-4">
@@ -490,6 +536,15 @@
     <script src="sync-manager.js"></script>
     <script src="ui-dialogs.js"></script>
     <script src="zip-export.js"></script>
+    <script src="line-diff.js"></script>
+    <script src="cost.js"></script>
+    <script src="presets.js"></script>
+    <script src="offline-queue.js"></script>
+    <script src="ide-review.js"></script>
+    <script src="mobile-editor.js"></script>
+    <script src="preview-console.js"></script>
+    <script src="agent-extras.js"></script>
+    <script src="mobile-ide.js"></script>
     <script src="ide.js"></script>
 </body>
 </html>

@@ -17,14 +17,22 @@ import { html } from "@codemirror/lang-html";
 import { css } from "@codemirror/lang-css";
 import { json } from "@codemirror/lang-json";
 import { markdown } from "@codemirror/lang-markdown";
+import { python } from "@codemirror/lang-python";
+import { xml } from "@codemirror/lang-xml";
 
-function languageFor(path = "") {
-  const p = String(path).toLowerCase();
-  if (/\.(m?js|jsx|ts|tsx)$/.test(p)) return javascript({ jsx: /x$/.test(p), typescript: /ts/.test(p) });
-  if (/\.(html?|svelte|vue)$/.test(p)) return html();
-  if (/\.(css|scss)$/.test(p)) return css();
-  if (/\.json$/.test(p)) return json();
-  if (/\.(md|markdown)$/.test(p)) return markdown();
+// Accepts a file path ("app.js") or an IDE language name ("javascript").
+function languageFor(pathOrLang = "") {
+  const v = String(pathOrLang).toLowerCase();
+  const ext = v.includes(".") ? v.split(".").pop() : v;
+  if (["js", "mjs", "jsx", "ts", "tsx", "javascript", "typescript"].includes(ext)) {
+    return javascript({ jsx: /x$/.test(ext), typescript: /ts/.test(ext) });
+  }
+  if (["html", "htm", "svelte", "vue"].includes(ext)) return html();
+  if (["css", "scss", "sass"].includes(ext)) return css();
+  if (ext === "json") return json();
+  if (["md", "markdown"].includes(ext)) return markdown();
+  if (["py", "python"].includes(ext)) return python();
+  if (["xml", "svg"].includes(ext)) return xml();
   return [];
 }
 

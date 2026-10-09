@@ -399,3 +399,133 @@ body { min-height: 100vh; min-height: 100dvh; }
 @media (prefers-reduced-motion: reduce) {
     .app-toast, .app-dialog-overlay, .app-dialog-card { animation: none; transition: none; }
 }
+
+/* ==========================================================================
+   Feature styles (AI review, diff, console, phone IDE). Desktop is unchanged
+   except for the review card, diff and console, which are scoped below.
+   ========================================================================== */
+
+/* Phone / tablet IDE: one pane at a time, switched by bottom tabs or swipe. */
+@media (max-width: 767px) {
+    body.mobile-ide {
+        padding-bottom: env(safe-area-inset-bottom);
+    }
+    body.mobile-ide #ideMain > #filesSidebar,
+    body.mobile-ide #ideMain > #agentSidebar,
+    body.mobile-ide #ideMain > #editorSection {
+        position: absolute !important;
+        inset: 0 !important;
+        width: 100% !important;
+        max-width: none !important;
+        display: none !important;
+        border: 0 !important;
+        z-index: 1 !important;
+    }
+    body.mobile-ide #ideMain[data-mtab="files"] > #filesSidebar,
+    body.mobile-ide #ideMain[data-mtab="chat"] > #agentSidebar,
+    body.mobile-ide #ideMain[data-mtab="code"] > #editorSection,
+    body.mobile-ide #ideMain[data-mtab="preview"] > #editorSection {
+        display: flex !important;
+    }
+    body.mobile-ide #ideMain > #filesOverlay,
+    body.mobile-ide #ideMain > #agentOverlay,
+    body.mobile-ide #toggleFilesBtn,
+    body.mobile-ide #toggleAgentBtn,
+    body.mobile-ide #agenticModeBtn,
+    body.mobile-ide #togglePreviewBtn,
+    body.mobile-ide #openBotStoreBtn,
+    body.mobile-ide #closePreviewBtn {
+        display: none !important;
+    }
+    /* Code pane: tabs, editor, symbol row. Preview pane: only the preview and its console. */
+    body.mobile-ide #ideMain[data-mtab="code"] #previewPanel,
+    body.mobile-ide #ideMain[data-mtab="code"] #openPreviewTabBtn {
+        display: none !important;
+    }
+    body.mobile-ide #ideMain[data-mtab="code"] #mobileSymbolBar {
+        display: flex !important;
+    }
+    body.mobile-ide #ideMain[data-mtab="preview"] #editorWrap,
+    body.mobile-ide #ideMain[data-mtab="preview"] #openFilesTabs,
+    body.mobile-ide #ideMain[data-mtab="preview"] #mobileSymbolBar {
+        display: none !important;
+    }
+    body.mobile-ide #ideMain[data-mtab="preview"] #previewPanel {
+        display: flex !important;
+        flex: 1 1 auto;
+        height: auto !important;
+        border-top: 0;
+    }
+    body.mobile-ide #ideMain[data-mtab="preview"] #previewFrame {
+        flex: 1 1 auto;
+    }
+    body.mobile-ide #previewConsole {
+        height: 30vh;
+    }
+    body.mobile-ide #ideMain #filesSidebar,
+    body.mobile-ide #ideMain #agentSidebar {
+        -webkit-overflow-scrolling: touch;
+    }
+    body.mobile-ide #agentInput {
+        font-size: 16px; /* stops iOS/Android zoom on focus */
+    }
+    body.mobile-ide #editorWrap {
+        min-height: 0;
+    }
+    #mobileTabs .mtab {
+        padding: 12px 4px 10px;
+        font-size: 13px;
+        color: #9ca3af;
+        border-top: 2px solid transparent;
+    }
+    #mobileTabs .mtab[aria-selected="true"],
+    #mobileTabs .mtab.mtab-active {
+        color: #c4b5fd;
+        border-top-color: #a78bfa;
+    }
+    .mobile-symbol-bar {
+        display: none;
+        gap: 6px;
+        padding: 6px;
+        overflow-x: auto;
+        background: #111;
+        border-top: 1px solid #1f2937;
+        flex-shrink: 0;
+    }
+    .mobile-sym-key {
+        flex: 0 0 auto;
+        min-width: 40px;
+        height: 40px;
+        padding: 0 10px;
+        border-radius: 10px;
+        background: #1f2937;
+        color: #e5e7eb;
+        font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+        font-size: 16px;
+        touch-action: manipulation;
+    }
+    .mobile-sym-key:active {
+        background: #374151;
+    }
+}
+
+/* CodeMirror on phones: fill the pane and scroll inside it. */
+#cmContainer .cm-editor {
+    height: 100%;
+}
+#cmContainer .cm-scroller {
+    -webkit-overflow-scrolling: touch;
+}
+
+/* AI change review card and diff */
+.ai-review-card .ai-diff {
+    -webkit-overflow-scrolling: touch;
+}
+.ai-diff div {
+    min-height: 1.25rem;
+}
+
+/* Preview console */
+#consoleList {
+    -webkit-overflow-scrolling: touch;
+}

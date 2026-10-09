@@ -703,6 +703,19 @@ const VERSION_CONTROL = {
 
 const MONACO = {
     async init() {
+        // Phones: CodeMirror 6 instead of Monaco (see mobile-editor.js).
+        if (window.MobileIDE && MobileIDE.isOn()) {
+            const facade = await MobileIDE.mountEditor();
+            monacoEditor = facade;
+            facade.onDidChangeModelContent(debounce(() => {
+                if (activeFilePath) {
+                    window.dispatchEvent(new CustomEvent('monaco:content-changed', {
+                        detail: { path: activeFilePath, content: monacoEditor.getValue() }
+                    }));
+                }
+            }, 500));
+            return;
+        }
         return new Promise((resolve, reject) => {
             if (typeof require === 'undefined') {
                 reject(new Error('Monaco loader not available'));
@@ -761,10 +774,9 @@ const MONACO = {
         
         // Create or reuse model
         if (!monacoModels[path]) {
-            monacoModels[path] = monaco.editor.createModel(
-                file.content,
-                file.language
-            );
+            monacoModels[path] = (monacoEditor && monacoEditor.isMobileEditor)
+                ? MobileEditor.createModel(file.content, file.language)
+                : monaco.editor.createModel(file.content, file.language);
         } else {
             monacoModels[path].setValue(file.content);
         }
@@ -1066,7 +1078,7 @@ const AI_AGENT = {
             },
             execute: async (args) => {
                 try {
-                    await VFS.writeFile(args.path, args.content);
+                    await ChangeReview.write(args.path, args.content);
                     return JSON.stringify({ success: true, message: `File written: ${args.path}` }, null, 2);
                 } catch (e) {
                     return JSON.stringify({ success: false, error: e.message }, null, 2);
@@ -1094,7 +1106,7 @@ const AI_AGENT = {
                         return JSON.stringify({ success: false, error: 'Pattern not found in file' }, null, 2);
                     }
                     const newContent = content.replace(regex, args.replace_content);
-                    await VFS.writeFile(args.path, newContent);
+                    await ChangeReview.write(args.path, newContent);
                     return JSON.stringify({ success: true, message: 'File updated successfully' }, null, 2);
                 } catch (e) {
                     return JSON.stringify({ success: false, error: e.message }, null, 2);
@@ -1126,8 +1138,8 @@ const AI_AGENT = {
         }
     ],
 
-    async sendMessage(userMessage) {
-        if (isAgentProcessing) return;
+    async sendMessage(userMessage, opts = {}) {
+        if (isAgentProcessing) return 'busy';
 
         const text = (userMessage || '').trim();
         if (!text && !agentAttachedContent) return;
@@ -1157,8 +1169,16 @@ const AI_AGENT = {
             }
         }
         
-        this.addMessageToChat('user', userContent);
-        session.messages.push({ role: 'user', content: userContent });
+        if (opts.resend) {
+            // Queued message: it is already in the session, so reuse the stored (context-enriched) content.
+            const lastUser = [...session.messages].reverse().find(m => m.role === 'user');
+            if (lastUser) userContent = lastUser.content;
+        } else {
+            // Shown to the user without the attached files; sent to the model with them.
+            const context = AgentExtras.buildContext(text);
+            this.addMessageToChat('user', userContent);
+            session.messages.push({ role: 'user', content: AgentExtras.withContext(userContent, context) });
+        }
         updateAgenticEmptyState();
         // Auto-rename untitled chats from the first user message.
         if (session.name.startsWith('Chat #') && text) {
@@ -1166,7 +1186,7 @@ const AI_AGENT = {
             renderAgentSessionsList();
         }
         saveAgentSessionsToStorage();
-        agentInput.value = '';
+        if (!opts.resend) agentInput.value = '';
         this.clearAttachment();
         
         const statusEl = document.getElementById('agentStatusIndicator');
@@ -1202,7 +1222,8 @@ Be helpful, precise, and professional. All communication must be in English.`;
             const messages = [
                 { role: 'system', content: systemPrompt },
                 { role: 'user', content: initialContext },
-                ...session.messages.slice(-10) // Last 10 messages for context
+                // Older turns drop their attached file contents to keep requests small.
+                ...session.messages.slice(-10).map((m, i, arr) => (i === arr.length - 1 ? m : { ...m, content: AgentExtras.stripContext(m.content) }))
             ];
 
             // Get API config
@@ -1220,11 +1241,19 @@ Be helpful, precise, and professional. All communication must be in English.`;
                 return;
             }
 
-            // Execute tool loop
-            await this.executeToolLoop(messages, provider, apiKey, model, baseEndpoint);
+            // Execute tool loop. Plan mode stops after the plan until the user approves it.
+            const planOnly = !opts.approved && STORAGE.getItem('ide_plan_mode') === 'on';
+            await this.executeToolLoop(messages, provider, apiKey, model, baseEndpoint, 10, { planOnly });
+            return 'done';
 
         } catch (e) {
             console.error('[AI AGENT] Error:', e);
+            if (AgentExtras.isNetworkError(e) && session) {
+                // Connection dropped: keep the message queued instead of losing it.
+                if (!opts.fromQueue) AgentExtras.queueOffline(session.id, text || 'Continue');
+                statusEl.textContent = 'Offline';
+                return 'queued';
+            }
             const errorText = `Error: ${e.message}`;
             this.addMessageToChat('assistant', errorText);
             if (session) {
@@ -1232,6 +1261,7 @@ Be helpful, precise, and professional. All communication must be in English.`;
                 saveAgentSessionsToStorage();
             }
         } finally {
+            ChangeReview.endTurn();
             isAgentProcessing = false;
             agentAbortController = null;
             statusEl.textContent = 'Ready';
@@ -1241,7 +1271,7 @@ Be helpful, precise, and professional. All communication must be in English.`;
         }
     },
 
-    async executeToolLoop(messages, provider, apiKey, model, endpoint, maxIterations = 10) {
+    async executeToolLoop(messages, provider, apiKey, model, endpoint, maxIterations = 10, opts = {}) {
         let iterations = 0;
         
         // Build tool definitions for system prompt
@@ -1258,7 +1288,7 @@ Be helpful, precise, and professional. All communication must be in English.`;
         }).join('\n\n');
 
         // Add tool instructions to system message
-        const systemPrompt = `You are an AI assistant in a code IDE. You can use the following tools to interact with the file system and editor:
+        const systemPrompt = (opts.planOnly ? AgentExtras.PLAN_PROMPT + '\n\n' : '') + `You are an AI assistant in a code IDE. You can use the following tools to interact with the file system and editor:
 
 ${toolDescriptions}
 
@@ -1284,26 +1314,38 @@ If no tool is needed, just respond normally with your answer.`;
             iterations++;
             console.log(`[AI TOOL CALL] Iteration ${iterations}`);
 
-            const response = await this.callLLM(messages, provider, apiKey, model, endpoint);
-            
-            if (!response) break;
+            // Planning uses the strong model; editing uses the cheap one (model routing).
+            const planning = !!opts.planOnly;
+            const routing = AgentExtras.routing();
+            const usedModel = planning ? (routing.planModel || model) : (routing.editModel || model);
+            const live = AgentExtras.beginLiveBubble(getActiveAgentSession()?.id);
+            const response = await this.callLLM(messages, provider, apiKey, usedModel, endpoint, (text) => live.update(text));
 
-            const { content, toolCalls } = response;
+            if (!response) { live.remove(); break; }
+
+            const content = response.content;
+            // Plan mode never runs tools; a stopped reply never runs tools either.
+            const toolCalls = (planning || response.finishReason === 'aborted') ? [] : response.toolCalls;
             totalTokensUsed += response.usage?.total_tokens || 0;
-            this.updateTokenDisplay();
+            AgentExtras.recordUsage(response.usage, usedModel, provider);
 
-            // If no tool calls, just show response and exit
+            // If no tool calls, show the final answer and exit
             if (!toolCalls || toolCalls.length === 0) {
+                live.finish(content);
                 if (content) {
-                    this.addMessageToChat('assistant', content);
                     const activeSession = getActiveAgentSession();
                     if (activeSession) {
                         activeSession.messages.push({ role: 'assistant', content });
                         saveAgentSessionsToStorage();
                     }
                 }
+                AgentExtras.showContinue(['length', 'max_tokens'].includes(response.finishReason));
+                if (planning && content) AgentExtras.showPlanApproval(content);
                 break;
             }
+
+            // Tool calls: the raw JSON is not shown in the chat.
+            live.remove();
 
             // Execute tool calls
             for (const toolCall of toolCalls) {
@@ -1347,12 +1389,54 @@ If no tool is needed, just respond normally with your answer.`;
         }
     },
 
-    async callLLM(messages, provider, apiKey, model, endpoint) {
+    async callLLM(messages, provider, apiKey, model, endpoint, onDelta) {
         console.log('[AI TOOL CALL] Calling LLM:', provider, model);
         
         const url = endpoint || PROVIDERS[provider]?.url;
         const hasKey = PROVIDERS[provider]?.hasKey !== false;
         const providerConfig = PROVIDERS[provider];
+
+        // Streaming path: tokens appear as they arrive; Stop keeps the partial reply.
+        if (onDelta) {
+            const isAnthropic = providerConfig?.type === 'anthropic';
+            let headers;
+            let body;
+            if (isAnthropic) {
+                headers = HubPlatform.anthropicHeaders(apiKey);
+                const sys = messages.find(m => m.role === 'system');
+                body = {
+                    model,
+                    max_tokens: 4096,
+                    temperature: 0.7,
+                    messages: messages.filter(m => m.role !== 'system').map(m => ({ role: m.role === 'assistant' ? 'assistant' : 'user', content: convertContentForAnthropic(m.content) }))
+                };
+                if (sys) body.system = typeof sys.content === 'string' ? sys.content : normalizeContentToText(sys.content);
+            } else {
+                headers = { 'Content-Type': 'application/json' };
+                if (hasKey && apiKey) {
+                    headers['Authorization'] = `Bearer ${apiKey}`;
+                    if (provider === 'openrouter') {
+                        headers['HTTP-Referer'] = window.location.origin;
+                        headers['X-Title'] = 'Traliran AI IDE';
+                    }
+                }
+                body = { model, messages: messages.filter(m => m.role !== 'tool'), temperature: 0.7, stream_options: { include_usage: true } };
+            }
+            try {
+                const res = await AgentExtras.streamRequest({
+                    url: url + (isAnthropic ? '/messages' : '/chat/completions'),
+                    headers,
+                    body,
+                    anthropic: isAnthropic,
+                    signal: agentAbortController?.signal,
+                    onDelta: (full) => onDelta(full)
+                });
+                return { content: res.content, toolCalls: this.parseToolCallsFromText(res.content), usage: res.usage, finishReason: res.finishReason };
+            } catch (e) {
+                if (e.name === 'AbortError') return undefined;
+                throw new Error('Failed to connect to AI service: ' + e.message);
+            }
+        }
         
         // Tools are now in system prompt, no need to send via API
         
@@ -1403,7 +1487,8 @@ If no tool is needed, just respond normally with your answer.`;
                 return {
                     content: content,
                     toolCalls: toolCalls,
-                    usage: data.usage
+                    usage: data.usage,
+                    finishReason: data.stop_reason || null
                 };
             }
 
@@ -1459,7 +1544,8 @@ If no tool is needed, just respond normally with your answer.`;
             return {
                 content: content,
                 toolCalls: toolCalls,
-                usage: data.usage
+                usage: data.usage,
+                finishReason: data.choices?.[0]?.finish_reason || null
             };
 
         } catch (e) {
@@ -1555,9 +1641,7 @@ If no tool is needed, just respond normally with your answer.`;
     },
 
     updateTokenDisplay() {
-        if (tokenUsageDisplay) {
-            tokenUsageDisplay.textContent = `Tokens: ${totalTokensUsed.toLocaleString()}`;
-        }
+        AgentExtras.updateCostLabel();
     },
 
     stopGeneration() {
@@ -2166,6 +2250,16 @@ const PREVIEW = {
         this.isVisible = true;
         previewPanel.classList.remove('hidden');
         this.render();
+        if (window.MobileIDE && MobileIDE.isOn()) MobileIDE.show('preview');
+    },
+
+    // After an AI change to web files: refresh the preview (phones open the Preview pane).
+    refreshAfterAi() {
+        if (!previewFrame || !this.buildHtml()) return;
+        if (window.MobileIDE && MobileIDE.isOn()) { MobileIDE.show('preview'); return; }
+        this.isVisible = true;
+        previewPanel.classList.remove('hidden');
+        this.render();
     },
 
     // Open preview in a separate browser tab (desktop) or inline (mobile).
@@ -2211,7 +2305,7 @@ const PREVIEW = {
         }
 
         // srcdoc instead of a blob: URL (blob iframes are unreliable in some WebViews).
-        previewFrame.srcdoc = htmlContent;
+        previewFrame.srcdoc = PreviewConsole.loadInto(htmlContent);
     }
 };
 
@@ -2275,6 +2369,7 @@ function renderFileTree() {
                 fileDiv.innerHTML = `<span>📄</span><span class="truncate">${escapeHtml(name)}</span>`;
                 fileDiv.onclick = () => {
                     MONACO.openFile(itemPath);
+                    if (window.MobileIDE) MobileIDE.onFileOpened();
                     renderFileTree(); // Update active state
                     closeFilesDrawer();
                 };
@@ -2654,6 +2749,18 @@ async function init() {
     // Load commits from storage (IndexedDB-backed)
     await VERSION_CONTROL.loadCommitsFromStorage();
     
+    // Mobile layout, review toolbar, preview console, agent extras (all no-ops where not applicable).
+    if (window.HubPlatform && HubPlatform.isMobile) MobileIDE.init();
+    ChangeReview.bindToolbar();
+    PreviewConsole.bind({
+        frame: previewFrame,
+        panel: previewPanel,
+        list: document.getElementById('consoleList'),
+        clearBtn: document.getElementById('consoleClearBtn'),
+        onFix: (entry) => AgentExtras.fixError(entry)
+    });
+    AgentExtras.init();
+
     // Initialize Monaco
     try {
         await MONACO.init();
