@@ -1,70 +1,3 @@
-const PAID_ASSISTANTS_CONFIG = [
-    {
-        name: "Markdown assistant - $5",
-        description: "A productivity tool that automates knowledge management methods like Zettelkasten or P.A.R.A. by converting unformatted text and links into structured Markdown files for Obsidian or Notion. ",
-        link: "https://whop.com/joined/traliran-ai-huub/products/markdown-assistant/"
-    },
-    {
-        name: "Text Game Master (Co-writer for Authors) - $5",
-        description: "An AI-powered lore keeper and consistency editor for writers and screenwriters that ensures narrative logic and internal world rules are strictly followed.",
-        link: "https://whop.com/joined/traliran-ai-huub/products/text-game-master-co-writer-for-authors/"
-    },
-    {
-        name: "Short-Form Video Scriptwriter - $5",
-        description: "An AI marketing strategist designed to generate high-retention, non-generic scripts for short-form video platforms like TikTok, Reels, and Shorts, specifically targeted at the English-speaking market.",
-        link: "https://whop.com/joined/traliran-ai-huub/products/short-form-video-scriptwriter/"
-    },
-    {
-        name: "Mind-Map & Pin-Card Designer - $5",
-        description: "An analytical AI assistant specialized in information architecture, helping users transform raw data and complex ideas into logical, highly structured hierarchical diagrams.",
-        link: "https://whop.com/joined/traliran-ai-huub/products/mind-map-pin-card-designer/"
-    },
-    {
-        name: "Deep Script Analyst - $4",
-        description: "An advanced structural and narrative analytics AI designed for professional screenwriters, script doctors, and script supervisors. It deconstructs feature-length or episodic screenplays to analyze pacing, thematic cohesion, and character arc metrics without modifying the writer's creative voice.",
-        link: "https://whop.com/joined/traliran-ai-huub/products/deep-script-analyst/"
-    },
-    {
-        name: "AI Knowledge Auditor - $6",
-        description: "An advanced educational AI designed to battle information hoarding. Instead of just organizing notes, it audits the user's actual understanding of their saved materials through adaptive, Socratic-style testing and conceptual stress-tests.",
-        link: "https://whop.com/joined/traliran-ai-huub/products/ai-knowledge-auditor/"
-    },
-    {
-        name: "fact only ai - $4",
-        description: "Fact-Only AI: Never hallucinates. Only verified facts, or an honest: I don’t know. No guesswork, no fiction. Truth you can trust.",
-        link: "https://whop.com/joined/traliran-ai-huub/products/fact-only-ai/"
-    },
-    {
-        name: "BrainSpark AI - $5",
-        description: "BrainSpark AI: Your interactive brainstorming partner. Asks deep questions, sorts ideas by originality & feasibility, and delivers structure from chaos—even with zero input.",
-        link: "https://whop.com/joined/traliran-ai-huub/products/brainspark-ai-48/"
-    },
-    {
-        name: "LearnMate AI - $5",
-        description: "LearnMate AI: a tutor that first tests your level, then builds a custom learning plan and guides you through it with interactive lessons, quizzes, and real-world examples—adapting as you progress.",
-        link: "https://whop.com/joined/traliran-ai-huub/products/learnmate-ai/"
-    },
-    {
-        name: "ResumeVerity AI - $5",
-        description: "ResumeVerity AI compares a candidate’s resume with their interview transcript to expose lies, exaggerations, and inconsistencies. Paste two texts — get a detailed integrity report.",
-        link: "https://whop.com/traliran-ai-huub/resumeverity-ai-the-candidate-honesty-detector/"
-    },
-    {
-        name: "MindEase AI - $5",
-        description: "MindEase AI is an empathetic conversational partner that listens without judgment, helps reframe negative thoughts, and offers evidence-based coping tools. Not a therapist, but a supportive ear.",
-        link: "https://whop.com/traliran-ai-huub/mindease-ai-your-compassionate-conversational-companion/"
-    },
-    {
-        name: "HireMap AI - $5",
-        description: "HireMap AI gives expert hiring advice and builds a personalized, interactive recruitment action map on demand. Step‑by‑step guidance from job description to signed contract.",
-        link: "https://whop.com/traliran-ai-huub/hiremap-ai-the-recruitment-strategist-interactive-action-planner/"
-    },
-    {
-        name: "MarketViz AI  - $5",
-        description: "MarketViz AI gives high‑level marketing advice and instantly generates clean text‑based charts right in the chat. Strategy, analysis, and visual data – all in one place.",
-        link: "https://whop.com/traliran-ai-huub/marketviz-ai-the-marketing-strategist-with-built-in-data-visualization/"
-    }
-];
 
 let sessions = [];
 let currentSessionId = null;
@@ -124,7 +57,6 @@ const aiComplementBtn = document.getElementById('aiComplementBtn');
 const storeModal = document.getElementById('storeModal');
 const openStoreBtn = document.getElementById('openStoreBtn');
 const closeStoreModal = document.getElementById('closeStoreModal');
-const paidBotsContainer = document.getElementById('paidBotsContainer');
 const openMultiModelBtn = document.getElementById('openMultiModelBtn');
 const multiModelModal = document.getElementById('multiModelModal');
 const closeMultiModelModal = document.getElementById('closeMultiModelModal');
@@ -389,24 +321,6 @@ function buildMediaHtmlFromContent(content) {
     }).filter(Boolean).join('');
 }
 
-function renderPaidStoreBots() {
-    paidBotsContainer.innerHTML = '';
-    PAID_ASSISTANTS_CONFIG.forEach(bot => {
-        const botCard = document.createElement('div');
-        botCard.className = 'bg-gray-950 border border-gray-800 rounded-2xl p-4 flex flex-col justify-between h-36 relative overflow-hidden group';
-        botCard.innerHTML = `
-            <div>
-                <h4 class="font-bold text-amber-400 text-sm">${bot.name}</h4>
-                <p class="text-xs text-gray-400 mt-1.5 line-clamp-2">${bot.description}</p>
-            </div>
-            <div class="flex justify-end mt-2">
-                <a href="${bot.link}" target="_blank" class="bg-amber-600 hover:bg-amber-500 text-white text-xs font-bold px-4 py-1.5 rounded-2xl transition text-center min-w-[70px]">Buy</a>
-            </div>
-        `;
-        paidBotsContainer.appendChild(botCard);
-    });
-}
-
 window.installFreeAssistant = function(name, promptText) {
     botNameInput.value = name;
     botPromptInput.value = promptText;
@@ -416,8 +330,16 @@ window.installFreeAssistant = function(name, promptText) {
     notifySuccess(`Assistant Profile "${name}" is now online!`);
 };
 
+let storeLibrary = null;
 openStoreBtn.addEventListener('click', () => {
-    renderPaidStoreBots();
+    const host = document.getElementById('storeLibrary');
+    if (!storeLibrary) {
+        storeLibrary = HubLibrary.renderStore(host, {
+            onUse: (assistant) => installFreeAssistant(assistant.name, assistant.prompt)
+        });
+    } else {
+        storeLibrary.refresh();
+    }
     storeModal.classList.remove('hidden');
 });
 closeStoreModal.addEventListener('click', () => { storeModal.classList.add('hidden'); });

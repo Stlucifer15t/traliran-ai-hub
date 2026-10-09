@@ -421,64 +421,17 @@
         </div>
     </div>
 
-    <div id="storeModal" class="hidden fixed inset-0 bg-black/80 z-50 flex items-center justify-center p-4">
-        <div class="bg-gray-900 border border-gray-800 rounded-2xl max-w-4xl w-full p-6 space-y-6 shadow-2xl relative flex flex-col max-h-[90vh]">
-            <button id="closeStoreModal" class="absolute top-4 right-4 text-gray-400 hover:text-white font-bold text-lg cursor-pointer" aria-label="Close"><svg class="svg-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M18 6L6 18M6 6l12 12"/></svg></button>
-            
-            <div>
-                <h2 class="text-2xl font-black text-amber-400 tracking-wide flex items-center gap-2"><svg class="svg-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 2L3 6v14a2 2 0 002 2h14a2 2 0 002-2V6l-3-4zM3 6h18M16 10a4 4 0 01-8 0"/></svg> Assistant Store</h2>
-                <p class="text-xs text-gray-400 mt-1">Get built-in standard extensions or expand library with custom presets.</p>
-            </div>
-
-            <div class="flex-1 overflow-y-auto chat-scroll space-y-6 pr-2">
-                <div class="bg-gradient-to-r from-indigo-950 to-purple-950 border border-indigo-500/40 rounded-xl p-4 flex items-start gap-3 relative overflow-hidden">
-                    <div class="text-indigo-300"><svg class="svg-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3l1.88 5.76a2 2 0 001.36 1.36L21 12l-5.76 1.88a2 2 0 00-1.36 1.36L12 21l-1.88-5.76a2 2 0 00-1.36-1.36L3 12l5.76-1.88a2 2 0 001.36-1.36L12 3z"/></svg></div>
-                    <div class="text-sm text-indigo-100 flex-1">
-                        <span class="font-bold text-white">Need a custom bot or feature?</span> If you would like me to build a custom assistant or functionality for the hub just for you, please fill out <a href="https://docs.google.com/forms/d/e/1FAIpQLScw0LuQ_06jXy-JUX_-GjHRv36CiQI-YcgKsCol7vVwW-YVsw/viewform" target="_blank" rel="noopener" class="text-amber-300 underline hover:text-amber-200 font-semibold">this form</a>.
-                    </div>
-                </div>
-
+    <div id="storeModal" class="hidden modal-backdrop">
+        <div class="modal-panel store-panel" role="dialog" aria-modal="true" aria-labelledby="storeTitle">
+            <header class="modal-head">
                 <div>
-                    <h3 class="text-sm font-bold uppercase text-gray-400 tracking-wider mb-3 border-b border-gray-800 pb-1">FREE:</h3>
-                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                        <div class="bg-gray-950 border border-gray-800 rounded-xl p-4 flex flex-col justify-between h-36 relative overflow-hidden group">
-                            <div>
-                                <h4 class="font-bold text-emerald-400 text-sm flex items-center gap-1.5"><svg class="svg-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 5h16M4 12h16M4 19h7"/></svg> Polyglot Translator</h4>
-                                <p class="text-xs text-gray-400 mt-1.5 line-clamp-2">Translates incoming texts into target language systems maintaining proper cultural idioms.</p>
-                            </div>
-                            <div class="flex justify-end mt-2">
-                                <button onclick="installFreeAssistant('Translator', 'You are an advanced expert translator. Your sole purpose is to translate any text provided into high-quality, fluent English (or the language specified by user), keeping idioms and contextual tone perfectly intact. Avoid chatbot greetings.')" class="bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold px-4 py-1.5 rounded-lg transition cursor-pointer">try</button>
-                            </div>
-                        </div>
-
-                        <div class="bg-gray-950 border border-gray-800 rounded-xl p-4 flex flex-col justify-between h-36 relative overflow-hidden group">
-                            <div>
-                                <h4 class="font-bold text-emerald-400 text-sm flex items-center gap-1.5"><svg class="svg-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M17 3a2.83 2.83 0 114 4L7.5 20.5 2 22l1.5-5.5L17 3z"/></svg> Code & Text Editor</h4>
-                                <p class="text-xs text-gray-400 mt-1.5 line-clamp-2">Corrects syntax structural flaws, styles code, or fixes grammar blocks instantly.</p>
-                            </div>
-                            <div class="flex justify-end mt-2">
-                                <button onclick="installFreeAssistant('Editor Core', 'You are a professional editor. Analyze the user text or source code payload, fix bugs, optimize layout structures, polish grammatical issues, and return the cleaned output without conversational filler.')" class="bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold px-4 py-1.5 rounded-lg transition cursor-pointer">try</button>
-                            </div>
-                        </div>
-
-                        <div class="bg-gray-950 border border-gray-800 rounded-xl p-4 flex flex-col justify-between h-36 relative overflow-hidden group">
-                            <div>
-                                <h4 class="font-bold text-emerald-400 text-sm flex items-center gap-1.5"><svg class="svg-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 18h6M10 22h4M12 2a7 7 0 00-4.9 12c.8.8 1.4 1.77 1.72 2.83.12.4.47.67.88.67h4.6c.41 0 .76-.27.88-.67.32-1.06.92-2.03 1.72-2.83A7 7 0 0012 2z"/></svg> Ideation Generator</h4>
-                                <p class="text-xs text-gray-400 mt-1.5 line-clamp-2">Brainstorms creative concepts, scripts, plot designs, and mechanics loops.</p>
-                            </div>
-                            <div class="flex justify-end mt-2">
-                                <button onclick="installFreeAssistant('Idea Spark', 'You are a creative brainstorming engine. Generate out-of-the-box ideas, architectural blueprints, script writing angles, and unique strategic concepts based on user prompts. Deliver responses using highly structured bullet points.')" class="bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold px-4 py-1.5 rounded-lg transition cursor-pointer">try</button>
-                            </div>
-                        </div>
-                    </div>
+                    <p class="eyebrow">Library</p>
+                    <h2 id="storeTitle" class="modal-title">Assistant Store</h2>
+                    <p class="modal-sub">Ready-made assistants, all free. Pick one to load its prompt, or write your own.</p>
                 </div>
-
-                <div>
-                    <h3 class="text-sm font-bold uppercase text-gray-400 tracking-wider mb-3 border-b border-gray-800 pb-1">PAID:</h3>
-                    <div id="paidBotsContainer" class="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                    </div>
-                </div>
-            </div>
+                <button id="closeStoreModal" class="icon-btn" aria-label="Close store">&times;</button>
+            </header>
+            <div id="storeLibrary" class="modal-body"></div>
         </div>
     </div>
 
@@ -668,6 +621,7 @@
     <script src="sync-manager.js"></script>
     <script src="mcp.js"></script>
     <script src="ui-dialogs.js"></script>
+    <script src="assistant-library.js"></script>
     <script src="app.js"></script>
 </body>
 </html>

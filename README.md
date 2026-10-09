@@ -38,7 +38,7 @@ I build custom deployments with pre-configured prompt libraries, custom UI, and 
 
 ### Assistant Store
 
-Inside, you can unlock exclusive Premium Bots (advanced system prompts and configurations for scriptwriters, prompt engineers, and content creators) for just **$4 – $6**. Skip hours of tedious prompt tuning and get production-ready tools for the price of a coffee!
+The Assistant Store is free. It ships about 38 ready-made assistants in seven categories (Write, Code, Learn, Work, Create, Languages, Think), such as Code Reviewer, Debug Detective, Socratic Tutor and Meeting Notes. Search, filter, and tap **Use** to load one. You can also write your own prompt, which is saved only on your device. Nothing is sold or linked to a paid service.
 
 ---
 
@@ -68,7 +68,7 @@ Inside, you can unlock exclusive Premium Bots (advanced system prompts and confi
 *   **📚 RAG Playground:** Build a local knowledge base, run dedicated RAG chats over it, and export Hub notes straight into the knowledge base.
 *   **☁️ Cloud Sync:** Optional Firebase / Supabase / PocketBase / generic-backend sync with offline queueing for sessions, notes, VFS files, commits, and agent chats.
 *   **💻 Built-in Sandbox Interpreter:** Execute, preview, and test generated HTML/JS/CSS code snippets securely in an isolated iframe without leaving the main chat workspace.
-*   **🏪 Assistant Store:** Access a marketplace of free and premium, highly-optimized AI assistant presets and custom prompts for various tasks (e.g., Polyglot Translator, Code & Text Editor, Ideation Generator).
+*   **🏪 Assistant Store:** A free library of about 38 ready-made assistants with search and categories, plus a builder for your own prompts saved on-device.
 *   **⚙️ Advanced Parameters Control:** Fine-tune system behaviors with on-the-fly adjustable sliders for Temperature, Top P, and Max Tokens configuration.
 *   **🧩 MCP (Model Context Protocol):** Connect remote MCP servers over Streamable HTTP and expose their tools to the AI as function-calling tools — just like an IDE agent. The model decides when to call a tool, the hub proxies the call, feeds the result back, and repeats. Works with any Streamable HTTP MCP endpoint; configure servers in the **🧩 MCP Servers** modal.
 

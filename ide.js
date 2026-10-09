@@ -12,13 +12,6 @@ let customBots = [];
 let activeBotId = null;
 let editingBotId = null;
 
-const OFFICIAL_BOTS = [
-    {
-        name: "UX Forge AI",
-        description: "UX Forge AI analyzes your code inside the IDE for accessibility, performance, and modern UI patterns.",
-        link: "https://whop.com/traliran-ai-huub/ux-forge-ai"
-    },
-];
 
 // AI Agent State (multi-chat history, all comments in English)
 let agentSessions = [];
@@ -1711,32 +1704,14 @@ function renderBotStore() {
     
     botStoreGrid.innerHTML = '';
     
-    // Official/Premium Bots Section
-    const premiumSection = document.createElement('div');
-    premiumSection.className = 'col-span-full';
-    premiumSection.innerHTML = '<h3 class="text-sm font-bold text-amber-400 mb-3">🌟 Premium Assistants</h3>';
-    botStoreGrid.appendChild(premiumSection);
-    
-    const premiumGrid = document.createElement('div');
-    premiumGrid.className = 'grid grid-cols-1 sm:grid-cols-2 gap-4 col-span-full';
-    
-    OFFICIAL_BOTS.forEach(bot => {
-        const card = document.createElement('div');
-        card.className = 'bg-gray-800/50 border border-amber-900/50 rounded-xl p-4 space-y-2';
-        card.innerHTML = `
-            <div class="flex justify-between items-start">
-                <h4 class="font-bold text-amber-300">${escapeHtml(bot.name)}</h4>
-                <span class="text-[10px] bg-amber-900/50 text-amber-300 px-2 py-0.5 rounded">PREMIUM</span>
-            </div>
-            <p class="text-xs text-gray-400 line-clamp-2">${escapeHtml(bot.description)}</p>
-            <a href="${bot.link}" target="_blank" class="block text-center bg-amber-600 hover:bg-amber-700 text-white text-xs py-2 rounded-lg transition">
-                🔗 Get on Whop
-            </a>
-        `;
-        premiumGrid.appendChild(card);
+    // Free assistant library (shared with the chat app)
+    const libHost = document.createElement('div');
+    libHost.className = 'col-span-full';
+    botStoreGrid.appendChild(libHost);
+    HubLibrary.renderStore(libHost, {
+        activeId: activeBotId ? (String(activeBotId).startsWith('lib_') ? String(activeBotId).slice(4) : null) : null,
+        onUse: (assistant) => useLibraryAssistant(assistant)
     });
-    
-    botStoreGrid.appendChild(premiumGrid);
     
     // Custom Bots Section
     const customSection = document.createElement('div');
@@ -1813,6 +1788,16 @@ function openBotEditor(botId = null) {
     }
     
     botEditorModal.classList.remove('hidden');
+}
+
+// Installs a library assistant as an IDE bot (copied into "Your bots", then used).
+function useLibraryAssistant(assistant) {
+    const botId = 'lib_' + assistant.id;
+    if (!customBots.find(b => b.id === botId)) {
+        customBots = [...customBots, { id: botId, name: assistant.name, prompt: assistant.prompt }];
+        STORAGE.setItem('ide_custom_bots', JSON.stringify(customBots));
+    }
+    useBot(botId);
 }
 
 function useBot(botId) {
