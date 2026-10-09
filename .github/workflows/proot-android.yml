@@ -37,21 +37,24 @@ jobs:
         run: |
           set -euo pipefail
           NDK_BIN="$ANDROID_NDK_HOME/toolchains/llvm/prebuilt/linux-x86_64/bin"
-          TALLOC_DIR="$PWD/talloc/data/data/com.termux/files/usr"
           TALLOC_LIB="$(find talloc -name 'libtalloc.so' | head -1)"
           TALLOC_INC="$(dirname "$(find talloc -name talloc.h | head -1)")"
           mkdir -p out
           cp "$TALLOC_LIB" out/libtalloc.so
+          # Set CFLAGS/LDFLAGS in the environment, not on the make command line:
+          # command-line variables would override the Makefile's "LDFLAGS += -ltalloc".
+          export CFLAGS="-I$TALLOC_INC -O2 -fPIE"
+          export LDFLAGS="-L$PWD/out -Wl,-rpath,\$ORIGIN"
           cd proot/src
           make clean >/dev/null 2>&1 || true
-          make -j"$(nproc)" \
-            CC="$NDK_BIN/aarch64-linux-android24-clang" \
-            CFLAGS="-I$TALLOC_INC -O2 -fPIE" \
-            LDFLAGS="-L$PWD/../../out -ltalloc -pie -Wl,-rpath,'\$ORIGIN' -Wl,-rpath-link=$PWD/../../out"
-          ls -la proot loader 2>/dev/null || find . -maxdepth 2 -name 'proot*' -type f
+          make -j"$(nproc)" CC="$NDK_BIN/aarch64-linux-android24-clang" proot loader/loader
+          ls -la proot loader/loader
           cp proot ../../out/libproot.so
-          cp loader ../../out/libproot-loader.so
-          cd ../.. && ls -la out
+          cp loader/loader ../../out/libproot-loader.so
+          cd ../..
+          ls -la out
+          # Confirm the library dependency resolves to our bundled libtalloc.
+          "$NDK_BIN/llvm-readelf" -d out/libproot.so | grep -i 'NEEDED\|RUNPATH\|RPATH' || true
 
       - uses: actions/upload-artifact@v4
         with:
