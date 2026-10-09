@@ -54,7 +54,7 @@ jobs:
           cp "$TALLOC_LIB" out/libtalloc.so
           # Set CFLAGS/LDFLAGS in the environment, not on the make command line:
           # command-line variables would override the Makefile's "LDFLAGS += -ltalloc".
-          export CFLAGS="-I$TALLOC_INC -O2 -fPIE"
+          export CFLAGS="-I$TALLOC_INC -O2 -fPIE -include string.h -include stdlib.h"
           export LDFLAGS="-L$PWD/out -Wl,-rpath,\$ORIGIN"
           cd proot/src
           make clean >/dev/null 2>&1 || true
