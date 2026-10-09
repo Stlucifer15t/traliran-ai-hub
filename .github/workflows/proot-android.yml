@@ -54,8 +54,11 @@ jobs:
           cp "$TALLOC_LIB" out/libtalloc.so
           # Set CFLAGS/LDFLAGS in the environment, not on the make command line:
           # command-line variables would override the Makefile's "LDFLAGS += -ltalloc".
-          export CFLAGS="-I$TALLOC_INC -O2 -fPIE -include string.h -include stdlib.h"
+          export CFLAGS="-I$TALLOC_INC -O2 -fPIE"
           export LDFLAGS="-L$PWD/out -Wl,-rpath,\$ORIGIN"
+          # ashmem_memfd.c calls strcmp/memset without <string.h>; newer NDK clang rejects that.
+          # Patch only that file. Force-including headers via CFLAGS breaks the loader's .S files.
+          sed -i '1i #include <string.h>' proot/src/extension/ashmem_memfd/ashmem_memfd.c
           cd proot/src
           make clean >/dev/null 2>&1 || true
           make -j"$(nproc)" CC="$NDK_BIN/aarch64-linux-android24-clang" proot loader/loader
