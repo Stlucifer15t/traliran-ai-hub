@@ -207,7 +207,7 @@
                 <article class="store-card${active ? ' is-active' : ''}">
                     <div class="store-card-top">
                         <span class="store-mark" data-cat="${esc(a.category)}" aria-hidden="true">${esc(initials(a.name))}</span>
-                        <span class="store-tag">${a.custom ? 'Mine' : 'Free'}</span>
+                        <span class="store-tag ${a.custom ? 'store-tag-mine' : 'store-tag-free'}">${a.custom ? 'Mine' : 'Free'}</span>
                     </div>
                     <h4 class="store-card-title">${esc(a.name)}</h4>
                     <p class="store-card-desc">${esc(a.tagline)}</p>
