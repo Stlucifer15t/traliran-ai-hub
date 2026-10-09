@@ -61,7 +61,7 @@ jobs:
           sed -i '1i #include <string.h>' proot/src/extension/ashmem_memfd/ashmem_memfd.c
           cd proot/src
           make clean >/dev/null 2>&1 || true
-          make -j"$(nproc)" CC="$NDK_BIN/aarch64-linux-android24-clang" proot loader/loader
+          make -j"$(nproc)" CC="$NDK_BIN/aarch64-linux-android24-clang" STRIP="$NDK_BIN/llvm-strip" OBJCOPY="$NDK_BIN/llvm-objcopy" proot loader/loader
           ls -la proot loader/loader
           cp proot ../../out/libproot.so
           cp loader/loader ../../out/libproot-loader.so
