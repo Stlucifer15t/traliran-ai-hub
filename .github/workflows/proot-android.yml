@@ -35,23 +35,13 @@ jobs:
 
       - name: Ensure talloc.h is available
         run: |
-          set -uo pipefail
-          HDR="$(find talloc -name talloc.h 2>/dev/null | head -1)"
-          if [ -n "$HDR" ]; then
-            echo "talloc.h found in the Termux package: $HDR"
-          else
-            echo "talloc.h not in the Termux package; fetching the upstream talloc release"
-            URL=https://www.samba.org/ftp/talloc/talloc-2.4.2.tar.gz
-            HTTP=$(curl -sSL -o talloc.tgz -w '%{http_code}' "$URL" || true)
-            echo "download HTTP status: $HTTP"
-            ls -la talloc.tgz || { echo "download failed"; exit 1; }
-            echo "archive members that end in talloc.h:"
-            tar -tzf talloc.tgz | grep 'talloc\.h$' || true
-            MEMBER="$(tar -tzf talloc.tgz | grep '/talloc\.h$' | head -1)"
+          set -euo pipefail
+          if [ -z "$(find talloc -name talloc.h 2>/dev/null | head -1)" ]; then
+            echo "talloc.h not in the Termux package; using the upstream header from the Samba repo"
             mkdir -p talloc-include
-            tar -xzf talloc.tgz -C talloc-include "$MEMBER"
-            cp "talloc-include/$MEMBER" talloc-include/talloc.h
+            curl -fsSL https://raw.githubusercontent.com/samba-team/samba/master/lib/talloc/talloc.h -o talloc-include/talloc.h
           fi
+          ls -la talloc-include 2>/dev/null || true
           find talloc talloc-include -name talloc.h 2>/dev/null
 
       - name: Build proot and loader with the NDK
