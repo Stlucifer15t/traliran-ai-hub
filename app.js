@@ -2488,9 +2488,11 @@ exportToRagBtn.addEventListener('click', exportNoteToRAG);
 exportNoteBtn.addEventListener('click', exportNoteToMD);
 
 exportJsonBtn.addEventListener('click', async () => {
+    const includeKeys = document.getElementById('exportIncludeKeys')?.checked === true;
     const config = {
         provider: apiProvider.value,
-        apiKey: apiKeyValue.value.trim(),
+        // API keys are stripped unless the user explicitly opts in.
+        ...(includeKeys ? { apiKey: apiKeyValue.value.trim() } : {}),
         endpoint: apiEndpoint.value.trim(),
         botName: botNameInput.value.trim(),
         systemPrompt: botPromptInput.value.trim(),

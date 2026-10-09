@@ -345,6 +345,16 @@ const STORAGE = {
         }
         this._cache = { ...legacy };
 
+        // Encryption at rest for API keys (see vault.js). Failure keeps plaintext.
+        try {
+            if (typeof Vault !== 'undefined') {
+                const store = Vault.indexedDbKeyStore();
+                await Vault.init({ loadKey: () => store.loadKey(), saveKey: (k) => store.saveKey(k) });
+            }
+        } catch (e) {
+            console.error('[STORAGE] Vault unavailable, keys stay unencrypted:', e);
+        }
+
         try {
             await window.projectDB.initPromise;
 
@@ -392,6 +402,7 @@ const STORAGE = {
             console.error('[STORAGE] IndexedDB unavailable, using legacy fallback:', e);
         }
 
+        await this._unsealSecrets();
         this._setupChannel();
         this._pendingWrites = {};
         this._initialized = true;
@@ -399,6 +410,40 @@ const STORAGE = {
 
     _isManagedKey(key) {
         return typeof key === 'string' && (key.startsWith('gem_') || key.startsWith('ide_'));
+    },
+
+    /** Keys whose values are secrets and must be sealed in IndexedDB. */
+    _isSecretKey(key) {
+        return typeof key === 'string' && key.startsWith('gem_key_');
+    },
+
+    _secretChain: {},
+
+    /** Serialises writes per key so sealed values land in the order they were set. */
+    _queueSecret(key, task) {
+        const prev = this._secretChain[key] || Promise.resolve();
+        const next = prev.then(task).catch(e => console.error('[STORAGE] secret write error:', e));
+        this._secretChain[key] = next;
+        return next;
+    },
+
+    /** Decrypts secret values into the cache; migrates old plaintext to sealed form. */
+    async _unsealSecrets() {
+        if (typeof Vault === 'undefined') return;
+        for (const key of Object.keys(this._cache)) {
+            if (!this._isSecretKey(key)) continue;
+            const value = this._cache[key];
+            if (Vault.isSealed(value)) {
+                try {
+                    this._cache[key] = await Vault.open(value);
+                } catch (e) {
+                    console.warn('[STORAGE] Could not open sealed key', key, '- re-enter it in Settings.');
+                    delete this._cache[key];
+                }
+            } else if (Vault.enabled() && value) {
+                this._queueSecret(key, async () => KV_STORE.set(key, await Vault.seal(value)));
+            }
+        }
     },
 
     ready() {
@@ -417,6 +462,10 @@ const STORAGE = {
         if (this._channel) {
             this._channel.postMessage({ type: 'storage', key, newValue: val, oldValue });
         }
+        if (this._isSecretKey(key) && typeof Vault !== 'undefined' && Vault.enabled()) {
+            this._queueSecret(key, async () => KV_STORE.set(key, await Vault.seal(val)));
+            return;
+        }
         KV_STORE.set(key, val).catch(e => console.error('[STORAGE] set error:', e));
     },
 
@@ -426,6 +475,10 @@ const STORAGE = {
         if (!this._initialized) this._pendingWrites[key] = true;
         if (this._channel) {
             this._channel.postMessage({ type: 'storage', key, newValue: null, oldValue });
+        }
+        if (this._isSecretKey(key)) {
+            this._queueSecret(key, () => KV_STORE.remove(key));
+            return;
         }
         KV_STORE.remove(key).catch(e => console.error('[STORAGE] remove error:', e));
     },

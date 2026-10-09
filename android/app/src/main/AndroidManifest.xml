@@ -5,7 +5,7 @@
          address such as http://192.168.1.20:11434. Only users who enter such an
          endpoint ever send traffic over it. -->
     <application
-        android:allowBackup="true"
+        android:allowBackup="false"
         android:usesCleartextTraffic="true"
         android:icon="@mipmap/ic_launcher"
         android:label="@string/app_name"

@@ -250,6 +250,10 @@
                         <input type="file" id="importJson" accept=".json" class="hidden">
                     </label>
                 </div>
+                <label class="flex items-start gap-2 text-xs text-amber-300 bg-amber-950/30 border border-amber-900 rounded-lg p-2 cursor-pointer">
+                    <input type="checkbox" id="exportIncludeKeys" class="mt-0.5 accent-amber-500">
+                    <span>Include my API keys in the export. Off by default. Anyone with this file can use your keys.</span>
+                </label>
             </div>
 
             <div id="statusIndicator" class="mt-auto p-3 bg-gray-950/80 border border-gray-800 rounded-lg text-xs text-gray-400">
@@ -658,6 +662,7 @@
     </div>
 
     <script src="platform.js"></script>
+    <script src="vault.js"></script>
     <script src="native-shell.js"></script>
     <script src="db-connector.js"></script>
     <script src="sync-manager.js"></script>
