@@ -339,6 +339,29 @@ function renderMessage(role, content, fromHistory) {
 async function fetchStreamingCompletion(config, messages, signal, onDelta) {
     const { provider, apiKey, endpoint, model } = config;
     const providerDetails = PROVIDERS[provider];
+
+    if (providerDetails.type === 'anthropic') {
+        // Claude has its own Messages API: x-api-key auth, system prompt as a field, text in content blocks.
+        // Not streamed here, so the whole answer arrives in one delta.
+        const textOf = (c) => typeof c === 'string' ? c : (Array.isArray(c) ? c.filter(p => p.type === 'text').map(p => p.text).join('\n') : '');
+        const system = messages.filter(m => m.role === 'system').map(m => textOf(m.content)).join('\n\n');
+        const convo = messages.filter(m => m.role !== 'system').map(m => ({ role: m.role === 'assistant' ? 'assistant' : 'user', content: textOf(m.content) }));
+        const res = await fetch(`${endpoint}/messages`, {
+            method: 'POST',
+            headers: HubPlatform.anthropicHeaders(apiKey),
+            body: JSON.stringify({ model, max_tokens: 4096, temperature: 0.7, ...(system ? { system } : {}), messages: convo }),
+            signal
+        });
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        const data = await res.json();
+        const text = (data.content || []).filter(b => b.type === 'text').map(b => b.text).join('');
+        if (data.usage) {
+            const i = data.usage.input_tokens || 0, o = data.usage.output_tokens || 0;
+            usageInfo.textContent = `Tokens: ${i + o} (P: ${i}, C: ${o})`;
+        }
+        if (text) onDelta(text);
+        return text;
+    }
     
     const headers = { 'Content-Type': 'application/json' };
     if (providerDetails.hasKey && apiKey) headers.Authorization = `Bearer ${apiKey}`;
