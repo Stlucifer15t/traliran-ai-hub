@@ -48,8 +48,8 @@ jobs:
         run: |
           set -euo pipefail
           NDK_BIN="$ANDROID_NDK_HOME/toolchains/llvm/prebuilt/linux-x86_64/bin"
-          TALLOC_LIB="$(find talloc -name 'libtalloc.so' | head -1)"
-          TALLOC_INC="$(dirname "$(find talloc talloc-include -name talloc.h 2>/dev/null | head -1)")"
+          TALLOC_LIB="$(realpath "$(find talloc -name 'libtalloc.so' | head -1)")"
+          TALLOC_INC="$(realpath "$(dirname "$(find talloc talloc-include -name talloc.h 2>/dev/null | head -1)")")"
           mkdir -p out
           cp "$TALLOC_LIB" out/libtalloc.so
           # Set CFLAGS/LDFLAGS in the environment, not on the make command line:
