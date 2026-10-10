@@ -170,3 +170,75 @@ Java_com_traliran_aihub_PtyBridge_close(JNIEnv *env, jclass cls, jint fd) {
     (void)cls;
     close(fd);
 }
+
+/*
+ * spawnPipes(exe, argv, envp, cwd, stderrPath) -> int[]{pid, stdinFd, stdoutFd} or null.
+ * Plain pipes, not a pseudo-terminal: used for stdio MCP servers, where the protocol is
+ * newline-delimited JSON and a terminal would echo input and rewrite newlines.
+ * stderr goes to stderrPath (truncated on each start), or /dev/null when that cannot be opened.
+ */
+JNIEXPORT jintArray JNICALL
+Java_com_traliran_aihub_PtyBridge_spawnPipes(JNIEnv *env, jclass cls, jstring jexe,
+                                             jobjectArray jargv, jobjectArray jenvp,
+                                             jstring jcwd, jstring jerrPath) {
+    (void)cls;
+    jintArray result = NULL;
+    const char *exe = jexe ? (*env)->GetStringUTFChars(env, jexe, NULL) : NULL;
+    const char *cwd = jcwd ? (*env)->GetStringUTFChars(env, jcwd, NULL) : NULL;
+    const char *errPath = jerrPath ? (*env)->GetStringUTFChars(env, jerrPath, NULL) : NULL;
+    char **argv = to_cstr_array(env, jargv);
+    char **envp = to_cstr_array(env, jenvp);
+
+    int in[2] = { -1, -1 };   /* parent writes in[1]; child reads in[0] as stdin */
+    int out[2] = { -1, -1 };  /* child writes out[1] as stdout; parent reads out[0] */
+
+    if (exe && argv && envp && pipe(in) == 0) {
+        if (pipe(out) == 0) {
+            /* A write to a server that has exited must fail with EPIPE, not kill the app. */
+            signal(SIGPIPE, SIG_IGN);
+            pid_t pid = fork();
+            if (pid == 0) {
+                dup2(in[0], 0);
+                dup2(out[1], 1);
+                int efd = errPath ? open(errPath, O_WRONLY | O_CREAT | O_TRUNC, 0600) : -1;
+                if (efd < 0) efd = open("/dev/null", O_WRONLY);
+                if (efd >= 0) dup2(efd, 2);
+                close(in[0]);
+                close(in[1]);
+                close(out[0]);
+                close(out[1]);
+                if (efd > 2) close(efd);
+                if (cwd) (void)chdir(cwd);
+                execve(exe, argv, envp);
+                _exit(127);
+            }
+            if (pid > 0) {
+                close(in[0]);
+                in[0] = -1;
+                close(out[1]);
+                out[1] = -1;
+                fcntl(in[1], F_SETFD, FD_CLOEXEC);
+                fcntl(out[0], F_SETFD, FD_CLOEXEC);
+                jint vals[3] = { (jint)pid, (jint)in[1], (jint)out[0] };
+                result = (*env)->NewIntArray(env, 3);
+                if (result) {
+                    (*env)->SetIntArrayRegion(env, result, 0, 3, vals);
+                    in[1] = -1;   /* now owned by the caller */
+                    out[0] = -1;
+                }
+            }
+            /* Close whatever is still open on failure paths. */
+            if (out[0] >= 0) close(out[0]);
+            if (out[1] >= 0) close(out[1]);
+        }
+        if (in[0] >= 0) close(in[0]);
+        if (in[1] >= 0) close(in[1]);
+    }
+
+    free_cstr_array(argv);
+    free_cstr_array(envp);
+    if (errPath) (*env)->ReleaseStringUTFChars(env, jerrPath, errPath);
+    if (cwd) (*env)->ReleaseStringUTFChars(env, jcwd, cwd);
+    if (exe) (*env)->ReleaseStringUTFChars(env, jexe, exe);
+    return result;
+}

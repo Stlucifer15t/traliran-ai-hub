@@ -603,6 +603,10 @@
                 <input type="text" id="mcpUrl" placeholder="https://host/mcp" class="bg-gray-950 border border-gray-800 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-fuchsia-500 font-mono">
                 <input type="text" id="mcpAuth" placeholder="Auth header (optional): Bearer xxx" class="bg-gray-950 border border-gray-800 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-fuchsia-500 font-mono">
             </div>
+            <div id="mcpStdioWrap" class="hidden">
+                <input type="text" id="mcpCommand" placeholder="Linux command (Android app): npx -y @modelcontextprotocol/server-filesystem /root/projects" class="w-full bg-gray-950 border border-gray-800 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-fuchsia-500 font-mono">
+                <p class="text-[11px] text-gray-500 mt-1">Runs inside Linux and talks over stdin/stdout. If this is filled in, the URL field is ignored. Node.js and npm must be installed in Linux first (apk add nodejs npm).</p>
+            </div>
             <div class="flex justify-end gap-2">
                 <button id="mcpAddBtn" class="bg-fuchsia-600 hover:bg-fuchsia-500 text-white text-xs font-semibold py-2 px-4 rounded-lg transition cursor-pointer">Add & Connect</button>
             </div>
@@ -621,6 +625,7 @@
     <script src="db-connector.js"></script>
     <script src="sync-manager.js"></script>
     <script src="mcp.js"></script>
+    <script src="mcp-stdio.js"></script>
     <script src="ui-dialogs.js"></script>
     <script src="assistant-library.js"></script>
     <script src="app.js"></script>

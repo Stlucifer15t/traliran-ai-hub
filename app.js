@@ -114,6 +114,13 @@ const mcpNameInput = document.getElementById('mcpName');
 const mcpUrlInput = document.getElementById('mcpUrl');
 const mcpAuthInput = document.getElementById('mcpAuth');
 const mcpAddBtn = document.getElementById('mcpAddBtn');
+const mcpCommandInput = document.getElementById('mcpCommand');
+{
+    // Stdio (Linux) servers exist only in the Android app.
+    const cap = window.Capacitor;
+    const native = !!(cap && typeof cap.isNativePlatform === 'function' && cap.isNativePlatform());
+    if (native) document.getElementById('mcpStdioWrap')?.classList.remove('hidden');
+}
 const mcpList = document.getElementById('mcpList');
 const mcpBadge = document.getElementById('mcpBadge');
 const mcpBadgeText = document.getElementById('mcpBadgeText');
@@ -405,13 +412,17 @@ function renderMcpList() {
 mcpAddBtn.addEventListener('click', async () => {
     const name = mcpNameInput.value.trim();
     const url = mcpUrlInput.value.trim();
-    if (!name || !url) { notifyWarning('Please enter a server name and URL.'); return; }
+    const command = mcpCommandInput ? mcpCommandInput.value.trim() : '';
+    if (!name || (!url && !command)) { notifyWarning('Please enter a server name and a URL (or a Linux command).'); return; }
     mcpAddBtn.disabled = true;
     mcpAddBtn.textContent = 'Connecting…';
     try {
-        const entry = MCP_MANAGER.add({ name, url, authHeader: mcpAuthInput.value });
+        const entry = command
+            ? MCP_MANAGER.addStdio({ name, command })
+            : MCP_MANAGER.add({ name, url, authHeader: mcpAuthInput.value });
         await MCP_MANAGER.connectOne(entry.id);
         mcpNameInput.value = ''; mcpUrlInput.value = ''; mcpAuthInput.value = '';
+        if (mcpCommandInput) mcpCommandInput.value = '';
         renderMcpList();
         updateMcpBadge();
     } catch (e) {

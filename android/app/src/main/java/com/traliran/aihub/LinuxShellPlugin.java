@@ -14,35 +14,46 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Iterator;
 import java.util.List;
+import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicInteger;
 
 /**
- * Runs commands inside the proot-based Linux root filesystem on a pseudo-terminal.
+ * Runs commands inside the proot-based Linux root filesystem.
  *
  * Layout under the app's files directory:
  *   linux/rootfs   the Linux root filesystem (installed by RootfsInstaller)
- *   linux/tmp      proot temporary directory
+ *   linux/tmp      proot temporary directory and MCP stderr logs
  *
  * Methods:
- *   status                         { installed }
- *   install                        downloads the root filesystem (events: install)
- *   start   { cols, rows, cwd? }   interactive shell session (one at a time)
- *   write / resize / stop          drive the interactive session
+ *   status                              { installed }
+ *   install                             downloads the root filesystem (events: install)
+ *   start   { cols, rows, cwd? }        interactive shell session (one at a time)
+ *   write / resize / stop               drive the interactive session
  *   run     { command, cwd?, env?, timeoutSec? }
- *                                  runs one command to completion; resolves { code, output, timedOut }
+ *                                       one command to completion; resolves { code, output, timedOut }
+ *   mcpStart { command, cwd?, env? }    stdio MCP server over pipes; resolves { handle }
+ *   mcpSend  { handle, message }        one JSON-RPC message (newline added here)
+ *   mcpStop  { handle }                 closes the server's stdin; SIGTERM after 2 s if still running
  *
  * Events to the web layer:
- *   data  { data: base64 }  bytes from the interactive terminal
- *   exit  { code: number }  the interactive shell has ended
- *   install { stage, percent }
+ *   data     { data: base64 }           bytes from the interactive terminal
+ *   exit     { code }                   the interactive shell has ended
+ *   install  { stage, percent }
+ *   mcpMessage { handle, line }         one line of JSON from an MCP server
+ *   mcpExit    { handle, code }         an MCP server has ended
+ *
+ * While any task runs, LinuxKeepAliveService keeps the process in the foreground.
  */
 @CapacitorPlugin(name = "LinuxShell")
 public class LinuxShellPlugin extends Plugin {
     private static final String TAG = "LinuxShell";
     private static final String TMP_REL = "linux/tmp";
     private static final int RUN_OUTPUT_LIMIT = 512 * 1024;
+    private static final int MCP_LINE_LIMIT = 8 * 1024 * 1024;
 
     private final ExecutorService io = Executors.newSingleThreadExecutor();
     private final ExecutorService runs = Executors.newCachedThreadPool();
@@ -50,6 +61,22 @@ public class LinuxShellPlugin extends Plugin {
     private volatile int pid = -1;
     private volatile int fd = -1;
     private final AtomicBoolean reaped = new AtomicBoolean(true);
+
+    private final Map<Integer, StdioServer> mcpServers = new ConcurrentHashMap<>();
+    private final AtomicInteger mcpSeq = new AtomicInteger(1);
+
+    /** A stdio MCP server process and its pipe ends. */
+    private static final class StdioServer {
+        final int pid;
+        final int inFd;
+        volatile boolean inClosed;
+        volatile boolean exited;
+
+        StdioServer(int pid, int inFd) {
+            this.pid = pid;
+            this.inFd = inFd;
+        }
+    }
 
     private RootfsInstaller installer() {
         return new RootfsInstaller(getContext().getFilesDir());
@@ -145,6 +172,10 @@ public class LinuxShellPlugin extends Plugin {
         return getContext().getApplicationInfo().nativeLibraryDir;
     }
 
+    private String filesDir() {
+        return getContext().getFilesDir().getAbsolutePath();
+    }
+
     private static String safeCwd(String cwd) {
         if (cwd == null || cwd.isEmpty()) return "/root";
         if (!cwd.startsWith("/") || cwd.contains("..") || cwd.contains("\0")) return "/root";
@@ -171,7 +202,7 @@ public class LinuxShellPlugin extends Plugin {
             argv.get(0),
             argv.toArray(new String[0]),
             env.toArray(new String[0]),
-            getContext().getFilesDir().getAbsolutePath(),
+            filesDir(),
             cols,
             rows
         );
@@ -185,6 +216,7 @@ public class LinuxShellPlugin extends Plugin {
         pid = childPid;
         fd = masterFd;
         reaped.set(false);
+        LinuxKeepAliveService.acquire(getContext());
 
         Thread reader = new Thread(() -> readLoop(childPid, masterFd), "linux-shell-reader");
         reader.setDaemon(true);
@@ -211,6 +243,7 @@ public class LinuxShellPlugin extends Plugin {
             pid = -1;
             fd = -1;
         }
+        LinuxKeepAliveService.release(getContext());
         JSObject ev = new JSObject();
         ev.put("code", code);
         notifyListeners("exit", ev);
@@ -301,55 +334,212 @@ public class LinuxShellPlugin extends Plugin {
     private JSObject runToCompletion(String command, String cwd, JSObject extra, int timeoutSec) throws Exception {
         List<String> argv = prootArgv(cwd, "/bin/sh", "-lc", command);
         List<String> env = prootEnv(extra);
-        int[] started = PtyBridge.spawn(
+        LinuxKeepAliveService.acquire(getContext());
+        try {
+            int[] started = PtyBridge.spawn(
+                argv.get(0),
+                argv.toArray(new String[0]),
+                env.toArray(new String[0]),
+                filesDir(),
+                200,
+                50
+            );
+            if (started == null) throw new IllegalStateException("could not start proot");
+            final int childPid = started[0];
+            final int masterFd = started[1];
+
+            final ByteArrayOutputStream out = new ByteArrayOutputStream();
+            Thread reader = new Thread(() -> {
+                byte[] buf = new byte[4096];
+                while (true) {
+                    int n = PtyBridge.read(masterFd, buf);
+                    if (n <= 0) break;
+                    synchronized (out) {
+                        if (out.size() < RUN_OUTPUT_LIMIT) {
+                            out.write(buf, 0, Math.min(n, RUN_OUTPUT_LIMIT - out.size()));
+                        }
+                    }
+                }
+            }, "linux-run-reader");
+            reader.setDaemon(true);
+            reader.start();
+
+            reader.join(timeoutSec * 1000L);
+            boolean timedOut = reader.isAlive();
+            if (timedOut) PtyBridge.kill(childPid, 9);
+            int code = PtyBridge.waitFor(childPid);
+            reader.join(2000);
+            PtyBridge.close(masterFd);
+
+            String text;
+            synchronized (out) {
+                text = new String(out.toByteArray(), StandardCharsets.UTF_8);
+            }
+            JSObject result = new JSObject();
+            result.put("code", code);
+            result.put("output", text);
+            result.put("timedOut", timedOut);
+            return result;
+        } finally {
+            LinuxKeepAliveService.release(getContext());
+        }
+    }
+
+    // ---- stdio MCP servers ----------------------------------------------------------------
+
+    /** Starts a server command with plain pipes. Each line the server writes arrives as mcpMessage. */
+    @PluginMethod
+    public void mcpStart(PluginCall call) {
+        final String command = call.getString("command", "");
+        if (command.isEmpty()) {
+            call.reject("No command given", "BAD_REQUEST");
+            return;
+        }
+        if (!installer().isInstalled()) {
+            call.reject("Linux is not installed yet", "NOT_INSTALLED");
+            return;
+        }
+        final String cwd = safeCwd(call.getString("cwd", "/root/projects"));
+        final JSObject extra = call.getObject("env");
+        final int handle = mcpSeq.getAndIncrement();
+
+        File tmp = new File(getContext().getFilesDir(), TMP_REL);
+        //noinspection ResultOfMethodCallIgnored
+        tmp.mkdirs();
+        File errLog = new File(tmp, "mcp-" + handle + ".log");
+
+        List<String> argv = prootArgv(cwd, "/bin/sh", "-lc", command);
+        List<String> env = prootEnv(extra);
+        int[] pipes = PtyBridge.spawnPipes(
             argv.get(0),
             argv.toArray(new String[0]),
             env.toArray(new String[0]),
-            getContext().getFilesDir().getAbsolutePath(),
-            200,
-            50
+            filesDir(),
+            errLog.getAbsolutePath()
         );
-        if (started == null) throw new IllegalStateException("could not start proot");
-        final int childPid = started[0];
-        final int masterFd = started[1];
+        if (pipes == null) {
+            call.reject("Could not start the MCP server", "SPAWN_FAILED");
+            return;
+        }
 
-        final ByteArrayOutputStream out = new ByteArrayOutputStream();
-        Thread reader = new Thread(() -> {
-            byte[] buf = new byte[4096];
-            while (true) {
-                int n = PtyBridge.read(masterFd, buf);
-                if (n <= 0) break;
-                synchronized (out) {
-                    if (out.size() < RUN_OUTPUT_LIMIT) {
-                        out.write(buf, 0, Math.min(n, RUN_OUTPUT_LIMIT - out.size()));
-                    }
-                }
-            }
-        }, "linux-run-reader");
+        final StdioServer server = new StdioServer(pipes[0], pipes[1]);
+        final int outFd = pipes[2];
+        mcpServers.put(handle, server);
+        LinuxKeepAliveService.acquire(getContext());
+
+        Thread reader = new Thread(() -> mcpReadLoop(handle, server, outFd), "linux-mcp-reader-" + handle);
         reader.setDaemon(true);
         reader.start();
 
-        reader.join(timeoutSec * 1000L);
-        boolean timedOut = reader.isAlive();
-        if (timedOut) PtyBridge.kill(childPid, 9);
-        int code = PtyBridge.waitFor(childPid);
-        reader.join(2000);
-        PtyBridge.close(masterFd);
-
-        String text;
-        synchronized (out) {
-            text = new String(out.toByteArray(), StandardCharsets.UTF_8);
-        }
         JSObject result = new JSObject();
-        result.put("code", code);
-        result.put("output", text);
-        result.put("timedOut", timedOut);
-        return result;
+        result.put("handle", handle);
+        call.resolve(result);
+    }
+
+    private void mcpReadLoop(int handle, StdioServer server, int outFd) {
+        ByteArrayOutputStream line = new ByteArrayOutputStream();
+        byte[] buf = new byte[8192];
+        boolean tooLong = false;
+        while (true) {
+            int n = PtyBridge.read(outFd, buf);
+            if (n <= 0) break;
+            for (int i = 0; i < n; i++) {
+                byte b = buf[i];
+                if (b == '\n') {
+                    if (!tooLong) emitMcpLine(handle, line.toByteArray());
+                    line.reset();
+                    tooLong = false;
+                } else if (!tooLong) {
+                    if (line.size() >= MCP_LINE_LIMIT) {
+                        tooLong = true;
+                        Log.w(TAG, "MCP server " + handle + " sent a line over the size limit; dropped");
+                    } else {
+                        line.write(b);
+                    }
+                }
+            }
+        }
+        if (!tooLong && line.size() > 0) emitMcpLine(handle, line.toByteArray());
+
+        int code = PtyBridge.waitFor(server.pid);
+        server.exited = true;
+        PtyBridge.close(outFd);
+        mcpServers.remove(handle);
+        // The write side must be closed on the io thread, after any pending writes.
+        io.execute(() -> {
+            if (!server.inClosed) {
+                server.inClosed = true;
+                PtyBridge.close(server.inFd);
+            }
+        });
+        LinuxKeepAliveService.release(getContext());
+        JSObject ev = new JSObject();
+        ev.put("handle", handle);
+        ev.put("code", code);
+        notifyListeners("mcpExit", ev);
+    }
+
+    private void emitMcpLine(int handle, byte[] raw) {
+        int len = raw.length;
+        if (len > 0 && raw[len - 1] == '\r') len--;
+        if (len == 0) return;
+        JSObject ev = new JSObject();
+        ev.put("handle", handle);
+        ev.put("line", new String(raw, 0, len, StandardCharsets.UTF_8));
+        notifyListeners("mcpMessage", ev);
+    }
+
+    @PluginMethod
+    public void mcpSend(PluginCall call) {
+        final StdioServer server = mcpServers.get(call.getInt("handle", -1));
+        if (server == null || server.exited || server.inClosed) {
+            call.reject("MCP server is not running", "NOT_RUNNING");
+            return;
+        }
+        final byte[] bytes = (call.getString("message", "") + "\n").getBytes(StandardCharsets.UTF_8);
+        io.execute(() -> {
+            if (server.inClosed) return;
+            if (PtyBridge.write(server.inFd, bytes, bytes.length) < 0) {
+                Log.w(TAG, "write to MCP server failed");
+            }
+        });
+        call.resolve();
+    }
+
+    @PluginMethod
+    public void mcpStop(PluginCall call) {
+        final int handle = call.getInt("handle", -1);
+        final StdioServer server = mcpServers.get(handle);
+        if (server == null) {
+            call.resolve();
+            return;
+        }
+        // Closing stdin tells a well-behaved MCP server to exit.
+        io.execute(() -> {
+            if (!server.inClosed) {
+                server.inClosed = true;
+                PtyBridge.close(server.inFd);
+            }
+        });
+        Thread killer = new Thread(() -> {
+            try {
+                Thread.sleep(2000);
+            } catch (InterruptedException ignored) {
+                return;
+            }
+            if (!server.exited) PtyBridge.kill(server.pid, 15);
+        }, "linux-mcp-killer-" + handle);
+        killer.setDaemon(true);
+        killer.start();
+        call.resolve();
     }
 
     @Override
     protected void handleOnDestroy() {
         stopSession();
+        for (StdioServer server : mcpServers.values()) {
+            PtyBridge.kill(server.pid, 15);
+        }
         io.shutdownNow();
         runs.shutdownNow();
         super.handleOnDestroy();

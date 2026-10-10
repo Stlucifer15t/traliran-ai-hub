@@ -168,7 +168,10 @@ const MCP_MANAGER = {
     async connectOne(id) {
         const cfg = this.servers.find(s => s.id === id);
         if (!cfg) return;
-        const client = new McpClient(cfg);
+        // Stdio servers run in the Linux environment (mcp-stdio.js); the rest use HTTP.
+        const client = cfg.transport === 'stdio' && window.StdioMcpClient
+            ? new window.StdioMcpClient(cfg)
+            : new McpClient(cfg);
         const tools = await client.connect();
         this.clients[id] = client;
         return tools;

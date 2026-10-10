@@ -14,6 +14,12 @@ final class PtyBridge {
     /** Returns {pid, masterFd}, or null when the child could not be started. */
     static native int[] spawn(String exe, String[] argv, String[] envp, String cwd, int cols, int rows);
 
+    /**
+     * Starts a child with plain pipes (no terminal): returns {pid, stdinFd, stdoutFd}, or null.
+     * stderr is written to stderrPath. Used for stdio MCP servers.
+     */
+    static native int[] spawnPipes(String exe, String[] argv, String[] envp, String cwd, String stderrPath);
+
     /** Blocking read from the master fd. Returns bytes read, 0 at end of file, -1 on error. */
     static native int read(int fd, byte[] buf);
 
