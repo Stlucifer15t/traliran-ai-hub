@@ -1294,11 +1294,14 @@ Be helpful, precise, and professional. All communication must be in English.`;
             return `### ${t.name}\nDescription: ${t.description}\nParameters:\n${paramList}`;
         }).join('\n\n');
 
+        // Global rules, project rules (AGENTS.md), memory and skills
+        const extraContext = window.AgentMemory ? await window.AgentMemory.buildContext() : '';
+
         // Add tool instructions to system message
         const systemPrompt = (window.AgentModes ? window.AgentModes.promptNote() + '\n\n' : '') + (opts.planOnly ? AgentExtras.PLAN_PROMPT + '\n\n' : '') + `You are an AI assistant in a code IDE. You can use the following tools to interact with the file system and editor:
 
 ${toolDescriptions}
-
+${extraContext ? '\n' + extraContext + '\n' : ''}
 To call a tool, respond with a JSON object in this exact format:
 {"tool": "tool_name", "arguments": {"param1": "value1", "param2": "value2"}}
 

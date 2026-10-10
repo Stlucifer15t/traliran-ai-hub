@@ -19,7 +19,8 @@
     const KEY = 'ide_agent_mode';
     const MODES = ['BUILD', 'PLAN', 'AUTO'];
     const LABELS = { BUILD: 'Build', PLAN: 'Plan', AUTO: 'Auto' };
-    const READ_ONLY = new Set(['list_files', 'read_file']);
+    // Read tools, plus memory and skills (they change app storage, not project files).
+    const ALLOWED_IN_PLAN = new Set(['list_files', 'read_file', 'remember', 'forget', 'load_skill']);
 
     function current() {
         let m = null;
@@ -40,7 +41,7 @@
     // Returns a message to send back to the model in place of the tool result,
     // or null when the tool may run.
     function gate(name) {
-        if (current() === 'PLAN' && !READ_ONLY.has(name)) {
+        if (current() === 'PLAN' && !ALLOWED_IN_PLAN.has(name)) {
             return 'Blocked: "' + name + '" changes files or runs commands, and PLAN mode is read-only. ' +
                 'Describe the change instead, or ask the user to switch to Build mode.';
         }
@@ -54,7 +55,7 @@
     function promptNote() {
         const m = current();
         if (m === 'PLAN') {
-            return 'Mode: PLAN. You are read-only. You may use list_files and read_file. ' +
+            return 'Mode: PLAN. You are read-only. You may use list_files, read_file, remember, forget and load_skill. ' +
                 'Do not write, edit, rename or run commands; describe the changes instead.';
         }
         if (m === 'AUTO') {

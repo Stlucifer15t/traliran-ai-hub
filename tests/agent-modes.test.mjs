@@ -44,6 +44,12 @@ test('PLAN allows read tools and blocks writes and commands', () => {
     assert.equal(m.autoApprove(), false);
 });
 
+test('PLAN still allows memory and skill tools (not project files)', () => {
+    const m = load();
+    m.set('PLAN');
+    for (const name of ['remember', 'forget', 'load_skill']) assert.equal(m.gate(name), null, name);
+});
+
 test('AUTO runs everything and skips the command approval wait', () => {
     const m = load();
     m.set('AUTO');
