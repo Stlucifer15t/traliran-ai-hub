@@ -324,19 +324,19 @@
                         <span id="streamingStatus"></span>
                     </div>
 
-                    <div class="max-w-6xl w-full mx-auto flex flex-row gap-2 items-end">
-                        <label class="bg-gray-800 hover:bg-gray-700 border border-gray-700 text-gray-200 p-2.5 rounded-lg transition cursor-pointer flex items-center justify-center shrink-0 w-[44px] h-[44px]" title="Attach text, image, video or PDF">
+                    <div class="max-w-6xl w-full mx-auto flex flex-row gap-2 items-end input-bar">
+                        <label class="input-chip" title="Attach text, image, video or PDF">
                             <svg class="svg-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21.44 11.05l-9.19 9.19a6 6 0 01-8.49-8.49l9.19-9.19a4 4 0 015.66 5.66l-9.2 9.19a2 2 0 01-2.83-2.83l8.49-8.48"/></svg>
                             <input type="file" id="attachmentInput" class="hidden" accept=".txt,.js,.html,.css,.json,.md,.py,.ts,.cpp,.java,.c,.pdf,image/*,video/*">
                         </label>
-                        <label class="bg-gray-800 hover:bg-gray-700 border border-gray-700 text-gray-200 p-2.5 rounded-lg transition cursor-pointer flex items-center justify-center shrink-0 w-[44px] h-[44px]" title="Take a photo (mobile camera)">
+                        <label class="input-chip" title="Take a photo (mobile camera)">
                             <svg class="svg-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M23 19a2 2 0 01-2 2H3a2 2 0 01-2-2V8a2 2 0 012-2h4l2-3h6l2 3h4a2 2 0 012 2z"/><circle cx="12" cy="13" r="4"/></svg>
                             <input type="file" id="cameraInput" class="hidden" accept="image/*" capture="environment">
                         </label>
 
                         <textarea id="userInput" rows="1" placeholder="Ask a question... (Ctrl+V to paste an image)"
                             title="You can paste an image from clipboard with Ctrl+V"
-                            class="flex-1 bg-gray-800 border border-gray-700 rounded-2xl px-4 py-2.5 text-sm focus:outline-none focus:border-emerald-500 resize-none max-h-32 chat-scroll min-h-[42px]"></textarea>
+                            class="input-field flex-1 chat-scroll"></textarea>
                         
                         <div class="flex gap-2 w-auto shrink-0">
                             <button id="sendBtn" class="bg-emerald-600 hover:bg-emerald-700 text-white font-medium px-4 sm:px-5 py-2.5 rounded-2xl text-sm transition flex items-center justify-center cursor-pointer h-[44px] min-w-[44px] shrink-0">

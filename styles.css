@@ -785,3 +785,36 @@ input::placeholder, textarea::placeholder { color: #666E80; }
     font-weight: 600;
 }
 #sendAgentBtn:hover, #sendBtn:hover { background-color: var(--accent-secondary) !important; }
+
+/* Composer as one input bar (AiCode direction): icon chips inside a rounded field. */
+.input-bar {
+    background: var(--bg-secondary);
+    border: 1px solid var(--border-color);
+    border-radius: 1.25rem;
+    padding: .4rem;
+    box-shadow: var(--shadow-card);
+}
+.input-bar .input-chip {
+    display: flex; align-items: center; justify-content: center;
+    width: 40px; height: 40px; flex-shrink: 0;
+    border-radius: 999px;
+    background: var(--bg-tertiary);
+    border: 1px solid var(--border-color);
+    color: var(--text-muted);
+    cursor: pointer;
+    transition: color .15s, border-color .15s;
+}
+.input-bar .input-chip:hover { color: var(--accent-color); border-color: var(--accent-color); }
+.input-bar .input-field {
+    background: transparent;
+    border: 0;
+    padding: .55rem .5rem;
+    font-size: .92rem;
+    color: var(--text-main);
+    min-height: 40px;
+    max-height: 8rem;
+    resize: none;
+}
+.input-bar .input-field:focus { outline: none; }
+.input-bar .input-field::placeholder { color: var(--ink-faint); }
+.input-bar:focus-within { border-color: var(--accent-color); }
