@@ -54,8 +54,13 @@ final class RootfsInstaller {
         return new File(linuxDir, "rootfs");
     }
 
+    /**
+     * bin/sh is a symlink to /bin/busybox with an absolute target. File.exists() follows that
+     * link on the phone's own filesystem, where /bin/busybox does not exist, so check the
+     * regular file that the link points to.
+     */
     boolean isInstalled() {
-        return new File(rootfsDir(), "bin/sh").exists();
+        return new File(rootfsDir(), "bin/busybox").isFile();
     }
 
     void install(Progress progress) throws IOException {
@@ -96,6 +101,9 @@ final class RootfsInstaller {
         if (!partial.renameTo(rootfsDir())) {
             deleteRecursively(partial);
             throw new IOException("Could not move the root filesystem into place");
+        }
+        if (!isInstalled()) {
+            throw new IOException("The archive did not contain bin/busybox; the install is incomplete");
         }
         progress.update("done", 100);
     }
