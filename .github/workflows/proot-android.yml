@@ -17,6 +17,10 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 40
     steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: true
+
       - name: Fetch proot source (Termux fork)
         run: git clone --depth 1 https://github.com/termux/proot.git proot
 
@@ -91,7 +95,7 @@ jobs:
             echo "jniLibs already up to date"
           else
             git commit -m "build(android): update proot libraries for arm64 from CI"
-            git push origin HEAD:"$GITHUB_REF_NAME"
+            git push origin HEAD:refs/heads/"$GITHUB_REF_NAME"
           fi
 
       - uses: actions/upload-artifact@v4
