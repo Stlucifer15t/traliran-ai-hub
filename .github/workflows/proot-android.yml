@@ -10,7 +10,7 @@ on:
     paths: ['.github/workflows/proot-android.yml']
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
   build:
@@ -76,6 +76,23 @@ jobs:
           ls -la out
           # Confirm the library dependency resolves to our bundled libtalloc.
           "$NDK_BIN/llvm-readelf" -d out/libproot.so | grep -i 'NEEDED\|RUNPATH\|RPATH' || true
+
+      - name: Place the libraries in jniLibs and commit them to the branch
+        if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
+        run: |
+          set -euo pipefail
+          DEST=android/app/src/main/jniLibs/arm64-v8a
+          mkdir -p "$DEST"
+          cp out/libproot.so out/libproot-loader.so out/libtalloc.so "$DEST"/
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add "$DEST"
+          if git diff --cached --quiet; then
+            echo "jniLibs already up to date"
+          else
+            git commit -m "build(android): update proot libraries for arm64 from CI"
+            git push origin HEAD:"$GITHUB_REF_NAME"
+          fi
 
       - uses: actions/upload-artifact@v4
         with:
