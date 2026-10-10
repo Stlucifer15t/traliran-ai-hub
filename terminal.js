@@ -18,7 +18,7 @@
         projectsBtn: $('projectsBtn'), projects: $('projects'), ghToken: $('ghToken'), saveTokenBtn: $('saveTokenBtn'),
         loadReposBtn: $('loadReposBtn'), cloneName: $('cloneName'), cloneBtn: $('cloneBtn'),
         repoFilter: $('repoFilter'), repoList: $('repoList'), projectList: $('projectList'),
-        projStatus: $('projStatus'), closeProjectsBtn: $('closeProjectsBtn'),
+        projStatus: $('projStatus'), closeProjectsBtn: $('closeProjectsBtn'), wsLink: $('wsLink'),
     };
 
     const enc = new TextEncoder();
@@ -278,6 +278,7 @@
 
     function wireProjects() {
         el.projectsBtn.hidden = false;
+        el.wsLink.hidden = false;
         el.projectsBtn.addEventListener('click', async () => {
             showProjects();
             setProjStatus('');
@@ -317,6 +318,13 @@
         });
     }
 
+    /** Working directory from ?cwd=, accepted only under /root/projects. */
+    function initialCwd() {
+        const c = new URLSearchParams(location.search).get('cwd');
+        if (!c || c.indexOf('\0') !== -1 || c.split('/').indexOf('..') !== -1) return undefined;
+        return c === '/root/projects' || c.indexOf('/root/projects/') === 0 ? c : undefined;
+    }
+
     async function init() {
         if (!LS) {
             el.unsupported.hidden = false;
@@ -329,7 +337,7 @@
             const { installed } = await LS.status();
             if (installed) {
                 setState('ready');
-                await startSession();
+                await startSession(initialCwd());
             } else {
                 setState('not installed', 'warn');
                 el.setup.classList.remove('hidden');
