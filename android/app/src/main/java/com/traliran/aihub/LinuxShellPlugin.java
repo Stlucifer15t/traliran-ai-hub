@@ -7,33 +7,45 @@ import com.getcapacitor.Plugin;
 import com.getcapacitor.PluginCall;
 import com.getcapacitor.PluginMethod;
 import com.getcapacitor.annotation.CapacitorPlugin;
+import java.io.ByteArrayOutputStream;
 import java.io.File;
+import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Iterator;
 import java.util.List;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 /**
- * Runs a shell inside the proot-based Linux root filesystem on a pseudo-terminal.
+ * Runs commands inside the proot-based Linux root filesystem on a pseudo-terminal.
  *
  * Layout under the app's files directory:
- *   linux/rootfs   the Linux root filesystem (installed by a later step)
+ *   linux/rootfs   the Linux root filesystem (installed by RootfsInstaller)
  *   linux/tmp      proot temporary directory
  *
- * Events to the web layer:
- *   data  { data: base64 }  bytes from the terminal
- *   exit  { code: number }  the shell has ended
+ * Methods:
+ *   status                         { installed }
+ *   install                        downloads the root filesystem (events: install)
+ *   start   { cols, rows, cwd? }   interactive shell session (one at a time)
+ *   write / resize / stop          drive the interactive session
+ *   run     { command, cwd?, env?, timeoutSec? }
+ *                                  runs one command to completion; resolves { code, output, timedOut }
  *
- * One session at a time. Starting a new session stops the previous one.
+ * Events to the web layer:
+ *   data  { data: base64 }  bytes from the interactive terminal
+ *   exit  { code: number }  the interactive shell has ended
+ *   install { stage, percent }
  */
 @CapacitorPlugin(name = "LinuxShell")
 public class LinuxShellPlugin extends Plugin {
     private static final String TAG = "LinuxShell";
     private static final String TMP_REL = "linux/tmp";
+    private static final int RUN_OUTPUT_LIMIT = 512 * 1024;
 
     private final ExecutorService io = Executors.newSingleThreadExecutor();
+    private final ExecutorService runs = Executors.newCachedThreadPool();
     private final AtomicBoolean installing = new AtomicBoolean(false);
     private volatile int pid = -1;
     private volatile int fd = -1;
@@ -43,7 +55,8 @@ public class LinuxShellPlugin extends Plugin {
         return new RootfsInstaller(getContext().getFilesDir());
     }
 
-    /** Reports whether the Linux root filesystem is in place. */
+    // ---- install and status ---------------------------------------------------------
+
     @PluginMethod
     public void status(PluginCall call) {
         JSObject result = new JSObject();
@@ -51,10 +64,7 @@ public class LinuxShellPlugin extends Plugin {
         call.resolve(result);
     }
 
-    /**
-     * Downloads and installs the root filesystem. Runs off the UI thread.
-     * Events: install { stage, percent }. Rejects with INSTALL_FAILED or INSTALL_RUNNING.
-     */
+    /** Downloads and installs the root filesystem. Runs off the UI thread. */
     @PluginMethod
     public void install(PluginCall call) {
         RootfsInstaller rootfs = installer();
@@ -87,37 +97,29 @@ public class LinuxShellPlugin extends Plugin {
         worker.start();
     }
 
-    @PluginMethod
-    public void start(PluginCall call) {
-        File filesDir = getContext().getFilesDir();
-        if (!installer().isInstalled()) {
-            call.reject("Linux is not installed yet", "NOT_INSTALLED");
-            return;
-        }
-        File rootfs = installer().rootfsDir();
-        int cols = call.getInt("cols", 80);
-        int rows = call.getInt("rows", 24);
+    // ---- shared command setup ---------------------------------------------------------
 
-        stopSession();
-
-        File tmp = new File(filesDir, TMP_REL);
-        //noinspection ResultOfMethodCallIgnored
-        tmp.mkdirs();
-
-        String nativeDir = getContext().getApplicationInfo().nativeLibraryDir;
-        String proot = nativeDir + "/libproot.so";
-
+    /** proot argv that runs args inside the root filesystem with cwd as the working directory. */
+    private List<String> prootArgv(String cwd, String... args) {
+        String rootfs = installer().rootfsDir().getAbsolutePath();
         List<String> argv = new ArrayList<>(Arrays.asList(
-            proot,
-            "-r", rootfs.getAbsolutePath(),
+            nativeDir() + "/libproot.so",
+            "-r", rootfs,
             "-b", "/dev",
             "-b", "/proc",
-            "-w", "/root",
-            "-L",
-            "/bin/sh", "-l"
+            "-w", cwd,
+            "-L"
         ));
+        argv.addAll(Arrays.asList(args));
+        return argv;
+    }
+
+    private List<String> prootEnv(JSObject extra) {
+        File tmp = new File(getContext().getFilesDir(), TMP_REL);
+        //noinspection ResultOfMethodCallIgnored
+        tmp.mkdirs();
         List<String> env = new ArrayList<>(Arrays.asList(
-            "PROOT_LOADER=" + nativeDir + "/libproot-loader.so",
+            "PROOT_LOADER=" + nativeDir() + "/libproot-loader.so",
             "PROOT_TMP_DIR=" + tmp.getAbsolutePath(),
             "PROOT_NO_SECCOMP=1",
             "HOME=/root",
@@ -126,12 +128,50 @@ public class LinuxShellPlugin extends Plugin {
             "LANG=C.UTF-8",
             "PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
         ));
+        if (extra != null) {
+            Iterator<String> keys = extra.keys();
+            while (keys.hasNext()) {
+                String k = keys.next();
+                // Only plain variable names; anything else would be a shell or proot injection.
+                if (k.matches("[A-Za-z_][A-Za-z0-9_]*")) {
+                    env.add(k + "=" + extra.optString(k, ""));
+                }
+            }
+        }
+        return env;
+    }
 
+    private String nativeDir() {
+        return getContext().getApplicationInfo().nativeLibraryDir;
+    }
+
+    private static String safeCwd(String cwd) {
+        if (cwd == null || cwd.isEmpty()) return "/root";
+        if (!cwd.startsWith("/") || cwd.contains("..") || cwd.contains("\0")) return "/root";
+        return cwd;
+    }
+
+    // ---- interactive session ----------------------------------------------------------
+
+    @PluginMethod
+    public void start(PluginCall call) {
+        if (!installer().isInstalled()) {
+            call.reject("Linux is not installed yet", "NOT_INSTALLED");
+            return;
+        }
+        int cols = call.getInt("cols", 80);
+        int rows = call.getInt("rows", 24);
+        String cwd = safeCwd(call.getString("cwd", "/root"));
+
+        stopSession();
+
+        List<String> argv = prootArgv(cwd, "/bin/sh", "-l");
+        List<String> env = prootEnv(null);
         int[] started = PtyBridge.spawn(
-            proot,
+            argv.get(0),
             argv.toArray(new String[0]),
             env.toArray(new String[0]),
-            filesDir.getAbsolutePath(),
+            getContext().getFilesDir().getAbsolutePath(),
             cols,
             rows
         );
@@ -225,10 +265,93 @@ public class LinuxShellPlugin extends Plugin {
         killer.start();
     }
 
+    // ---- one-shot commands ------------------------------------------------------------
+
+    /**
+     * Runs `sh -lc command` on its own pseudo-terminal, collects its output, and resolves
+     * with { code, output, timedOut }. Output past 512 KB is dropped. Independent of the
+     * interactive session.
+     */
+    @PluginMethod
+    public void run(PluginCall call) {
+        final String command = call.getString("command", "");
+        if (command.isEmpty()) {
+            call.reject("No command given", "BAD_REQUEST");
+            return;
+        }
+        if (!installer().isInstalled()) {
+            call.reject("Linux is not installed yet", "NOT_INSTALLED");
+            return;
+        }
+        final String cwd = safeCwd(call.getString("cwd", "/root"));
+        final int timeoutSec = Math.max(1, Math.min(call.getInt("timeoutSec", 600), 3600));
+        final JSObject extra = call.getObject("env");
+
+        runs.execute(() -> {
+            try {
+                call.resolve(runToCompletion(command, cwd, extra, timeoutSec));
+            } catch (Exception e) {
+                Log.e(TAG, "run failed", e);
+                String msg = e.getMessage() != null ? e.getMessage() : e.getClass().getSimpleName();
+                call.reject("Command failed to run: " + msg, "RUN_FAILED");
+            }
+        });
+    }
+
+    private JSObject runToCompletion(String command, String cwd, JSObject extra, int timeoutSec) throws Exception {
+        List<String> argv = prootArgv(cwd, "/bin/sh", "-lc", command);
+        List<String> env = prootEnv(extra);
+        int[] started = PtyBridge.spawn(
+            argv.get(0),
+            argv.toArray(new String[0]),
+            env.toArray(new String[0]),
+            getContext().getFilesDir().getAbsolutePath(),
+            200,
+            50
+        );
+        if (started == null) throw new IllegalStateException("could not start proot");
+        final int childPid = started[0];
+        final int masterFd = started[1];
+
+        final ByteArrayOutputStream out = new ByteArrayOutputStream();
+        Thread reader = new Thread(() -> {
+            byte[] buf = new byte[4096];
+            while (true) {
+                int n = PtyBridge.read(masterFd, buf);
+                if (n <= 0) break;
+                synchronized (out) {
+                    if (out.size() < RUN_OUTPUT_LIMIT) {
+                        out.write(buf, 0, Math.min(n, RUN_OUTPUT_LIMIT - out.size()));
+                    }
+                }
+            }
+        }, "linux-run-reader");
+        reader.setDaemon(true);
+        reader.start();
+
+        reader.join(timeoutSec * 1000L);
+        boolean timedOut = reader.isAlive();
+        if (timedOut) PtyBridge.kill(childPid, 9);
+        int code = PtyBridge.waitFor(childPid);
+        reader.join(2000);
+        PtyBridge.close(masterFd);
+
+        String text;
+        synchronized (out) {
+            text = new String(out.toByteArray(), StandardCharsets.UTF_8);
+        }
+        JSObject result = new JSObject();
+        result.put("code", code);
+        result.put("output", text);
+        result.put("timedOut", timedOut);
+        return result;
+    }
+
     @Override
     protected void handleOnDestroy() {
         stopSession();
         io.shutdownNow();
+        runs.shutdownNow();
         super.handleOnDestroy();
     }
 }

@@ -15,6 +15,10 @@
         state: $('state'), setup: $('setup'), installBtn: $('installBtn'), barWrap: $('barWrap'),
         bar: $('bar'), stage: $('stage'), error: $('error'), termWrap: $('term-wrap'), keys: $('keys'),
         ctrlBtn: $('ctrlBtn'), restartBtn: $('restartBtn'), stopBtn: $('stopBtn'), unsupported: $('unsupported'),
+        projectsBtn: $('projectsBtn'), projects: $('projects'), ghToken: $('ghToken'), saveTokenBtn: $('saveTokenBtn'),
+        loadReposBtn: $('loadReposBtn'), cloneName: $('cloneName'), cloneBtn: $('cloneBtn'),
+        repoFilter: $('repoFilter'), repoList: $('repoList'), projectList: $('projectList'),
+        projStatus: $('projStatus'), closeProjectsBtn: $('closeProjectsBtn'),
     };
 
     const enc = new TextEncoder();
@@ -110,6 +114,7 @@
         el.termWrap.classList.toggle('hidden', !on);
         el.keys.classList.toggle('hidden', !on);
         el.setup.classList.toggle('hidden', on);
+        el.projects.classList.toggle('hidden', on);
         if (on) {
             refit();
             term.focus();
@@ -136,10 +141,10 @@
 
     // ---- plugin wiring --------------------------------------------------------------
 
-    async function startSession() {
+    async function startSession(cwd) {
         refit();
         try {
-            await LS.start({ cols: term.cols, rows: term.rows });
+            await LS.start({ cols: term.cols, rows: term.rows, cwd: typeof cwd === 'string' ? cwd : undefined });
             running = true;
             setState('running', 'ok');
             el.restartBtn.hidden = true;
@@ -188,10 +193,129 @@
     }
 
     el.installBtn.addEventListener('click', install);
-    el.restartBtn.addEventListener('click', startSession);
+    el.restartBtn.addEventListener('click', () => startSession());
     el.stopBtn.addEventListener('click', async () => {
         if (LS) await LS.stop().catch(() => {});
     });
+
+    // ---- projects (GitHub import) ---------------------------------------------------
+
+    let repoCache = [];
+
+    function setProjStatus(text) {
+        el.projStatus.textContent = text;
+    }
+
+    function showProjects() {
+        el.termWrap.classList.add('hidden');
+        el.keys.classList.add('hidden');
+        el.setup.classList.add('hidden');
+        el.projects.classList.remove('hidden');
+    }
+
+    function item(title, detail, buttonLabel, onClick) {
+        const row = document.createElement('div');
+        row.className = 'item';
+        const text = document.createElement('div');
+        const strong = document.createElement('strong');
+        strong.textContent = title;
+        text.appendChild(strong);
+        if (detail) {
+            const small = document.createElement('small');
+            small.textContent = detail;
+            text.appendChild(small);
+        }
+        const btn = document.createElement('button');
+        btn.className = 'btn';
+        btn.textContent = buttonLabel;
+        btn.addEventListener('click', onClick);
+        row.append(text, btn);
+        return row;
+    }
+
+    async function refreshProjects() {
+        el.projectList.textContent = '';
+        try {
+            const names = await GitHubImport.listProjects(LS);
+            if (!names.length) {
+                el.projectList.textContent = 'No projects yet. Clone a repository above.';
+                return;
+            }
+            for (const name of names) {
+                const dir = GitHubImport.PROJECTS_DIR + '/' + name;
+                el.projectList.appendChild(item(name, dir, 'Open shell', () => startSession(dir)));
+            }
+        } catch (e) {
+            el.projectList.textContent = e.message || String(e);
+        }
+    }
+
+    function renderRepos() {
+        const q = el.repoFilter.value.trim().toLowerCase();
+        el.repoList.textContent = '';
+        const shown = repoCache.filter((r) => !q || r.fullName.toLowerCase().includes(q));
+        if (!shown.length) {
+            el.repoList.textContent = repoCache.length ? 'No repositories match.' : 'Load your repositories to see them here.';
+            return;
+        }
+        for (const r of shown) {
+            const detail = (r.private ? 'private' : 'public') + (r.description ? ' · ' + r.description : '');
+            el.repoList.appendChild(item(r.fullName, detail, 'Clone', () => cloneFrom(r.fullName)));
+        }
+    }
+
+    async function cloneFrom(fullName) {
+        setProjStatus('Starting…');
+        try {
+            const token = await GitHubImport.loadToken();
+            const dir = await GitHubImport.cloneRepo(LS, fullName, token, (stage) => setProjStatus(stage + '…'));
+            setProjStatus('Ready: ' + dir);
+            await refreshProjects();
+        } catch (e) {
+            setProjStatus(e.message || String(e));
+        }
+    }
+
+    function wireProjects() {
+        el.projectsBtn.hidden = false;
+        el.projectsBtn.addEventListener('click', async () => {
+            showProjects();
+            setProjStatus('');
+            el.ghToken.value = '';
+            el.ghToken.placeholder = (await GitHubImport.hasToken()) ? 'Token saved (enter a new one to replace)' : 'GitHub token (optional)';
+            await refreshProjects();
+        });
+        el.closeProjectsBtn.addEventListener('click', () => showTerminal(!!running));
+        el.saveTokenBtn.addEventListener('click', async () => {
+            try {
+                await GitHubImport.saveToken(el.ghToken.value);
+                el.ghToken.value = '';
+                el.ghToken.placeholder = (await GitHubImport.hasToken()) ? 'Token saved (enter a new one to replace)' : 'GitHub token (optional)';
+                setProjStatus('Token saved.');
+            } catch (e) {
+                setProjStatus(e.message || String(e));
+            }
+        });
+        el.loadReposBtn.addEventListener('click', async () => {
+            setProjStatus('Loading repositories…');
+            try {
+                repoCache = await GitHubImport.listRepos(await GitHubImport.loadToken());
+                renderRepos();
+                setProjStatus(repoCache.length + ' repositories.');
+            } catch (e) {
+                setProjStatus(e.message || String(e));
+            }
+        });
+        el.repoFilter.addEventListener('input', renderRepos);
+        el.cloneBtn.addEventListener('click', () => {
+            const name = el.cloneName.value.trim();
+            if (!GitHubImport.isValidName(name)) {
+                setProjStatus('Enter the repository as owner/name.');
+                return;
+            }
+            cloneFrom(name);
+        });
+    }
 
     async function init() {
         if (!LS) {
@@ -200,6 +324,7 @@
             return;
         }
         attachNative();
+        wireProjects();
         try {
             const { installed } = await LS.status();
             if (installed) {

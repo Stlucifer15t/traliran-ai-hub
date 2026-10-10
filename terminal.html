@@ -43,6 +43,16 @@
             border: 1px solid #2E3546; background: #171A22; color: #EDEFF4; cursor: pointer;
         }
         #keys button.on { background: #F5BD5C; color: #15100A; border-color: #F5BD5C; }
+        #projects .row { display: flex; gap: .5rem; margin-bottom: .6rem; }
+        #projects input { flex: 1; min-width: 0; font: inherit; font-size: .9rem; color: #EDEFF4;
+            background: #12151C; border: 1px solid #2E3546; border-radius: .6rem; padding: .5rem .7rem; }
+        #projects .list { max-height: 36vh; overflow: auto; border: 1px solid #232733; border-radius: .6rem; margin-bottom: .6rem; }
+        #projects .item { display: flex; justify-content: space-between; align-items: center; gap: .5rem;
+            padding: .55rem .7rem; border-bottom: 1px solid #1B2030; font-size: .9rem; }
+        #projects .item small { color: #9AA1B2; display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        #projects .item > div { min-width: 0; }
+        #projects .status { white-space: pre-wrap; font: .78rem/1.4 'Geist Mono', ui-monospace, monospace; color: #9AA1B2; min-height: 1rem; }
+        #projects.hidden { display: none; }
         #unsupported { margin: 1.5rem 1rem; color: #9AA1B2; line-height: 1.5; }
     </style>
 </head>
@@ -54,6 +64,7 @@
             <span id="state" class="pill">checking</span>
         </div>
         <div style="display:flex;gap:.4rem">
+            <button id="projectsBtn" class="btn" hidden>Projects</button>
             <button id="restartBtn" class="btn" hidden>New shell</button>
             <button id="stopBtn" class="btn" hidden>Stop</button>
         </div>
@@ -70,6 +81,28 @@
         <div class="bar" id="barWrap" hidden><div id="bar"></div></div>
         <div id="stage" style="color:#9AA1B2;font-size:.85rem"></div>
         <div id="error"></div>
+    </section>
+
+    <section id="projects" class="card hidden">
+        <h2>Projects</h2>
+        <p>Repositories are cloned into <code>/root/projects</code> inside Linux. A token lists your private repositories. It is stored encrypted on this device, and git receives it through an environment variable.</p>
+        <div class="row">
+            <input id="ghToken" type="password" autocomplete="off" placeholder="GitHub token (optional)">
+            <button id="saveTokenBtn" class="btn">Save token</button>
+        </div>
+        <div class="row">
+            <button id="loadReposBtn" class="btn btn-primary">Load my repos</button>
+        </div>
+        <div class="row">
+            <input id="cloneName" autocomplete="off" placeholder="owner/repo">
+            <button id="cloneBtn" class="btn">Clone</button>
+        </div>
+        <div class="row"><input id="repoFilter" placeholder="Filter repositories" autocomplete="off"></div>
+        <div id="repoList" class="list"></div>
+        <h2>Cloned</h2>
+        <div id="projectList" class="list"></div>
+        <div id="projStatus" class="status"></div>
+        <div class="row"><button id="closeProjectsBtn" class="btn">Back to terminal</button></div>
     </section>
 
     <div id="term-wrap" class="hidden"></div>
@@ -90,6 +123,8 @@
 
     <script src="vendor/xterm/xterm.js"></script>
     <script src="vendor/xterm/addon-fit.js"></script>
+    <script src="vault.js"></script>
+    <script src="github-import.js"></script>
     <script src="terminal.js"></script>
 </body>
 </html>
