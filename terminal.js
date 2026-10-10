@@ -33,8 +33,8 @@
         cursorBlink: true,
         scrollback: 5000,
         theme: {
-            background: '#0B0C10', foreground: '#EDEFF4', cursor: '#F5BD5C',
-            selectionBackground: '#2E3546',
+            background: '#07111F', foreground: '#F8FAFC', cursor: '#4ADE80',
+            selectionBackground: '#2A3D57',
         },
     });
     const fit = new FitAddon.FitAddon();

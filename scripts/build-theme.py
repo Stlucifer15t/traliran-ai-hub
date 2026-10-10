@@ -10,11 +10,11 @@ import colorsys, re, pathlib
 ROOT = pathlib.Path(__file__).resolve().parent.parent
 STOPS = {50: 97, 100: 93, 200: 86, 300: 76, 400: 66, 500: 56, 600: 47, 700: 38, 800: 29, 900: 21, 950: 13}
 
-# family -> (hue in degrees, saturation 0-1). Neutrals are a cool graphite; accent is warm amber.
+# family -> (hue in degrees, saturation 0-1). Neutrals are a cool graphite; accent is AiCode green (#4ADE80).
 FAMILIES = {
     'gray': (225, 0.12), 'slate': (222, 0.14), 'zinc': (240, 0.08),
-    'amber': (38, 0.88), 'yellow': (46, 0.92), 'orange': (24, 0.85),
-    'emerald': (38, 0.88), 'green': (150, 0.55), 'teal': (172, 0.60),
+    'amber': (142, 0.70), 'yellow': (46, 0.92), 'orange': (24, 0.85),
+    'emerald': (142, 0.70), 'green': (150, 0.55), 'teal': (172, 0.60),
     'sky': (203, 0.88), 'blue': (217, 0.86), 'indigo': (224, 0.72),
     'violet': (252, 0.70), 'purple': (266, 0.62), 'fuchsia': (318, 0.62),
     'rose': (352, 0.74), 'red': (1, 0.76), 'pink': (330, 0.66),
