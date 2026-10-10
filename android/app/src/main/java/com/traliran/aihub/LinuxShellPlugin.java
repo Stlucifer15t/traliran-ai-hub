@@ -31,22 +31,70 @@ import java.util.concurrent.atomic.AtomicBoolean;
 @CapacitorPlugin(name = "LinuxShell")
 public class LinuxShellPlugin extends Plugin {
     private static final String TAG = "LinuxShell";
-    private static final String ROOTFS_REL = "linux/rootfs";
     private static final String TMP_REL = "linux/tmp";
 
     private final ExecutorService io = Executors.newSingleThreadExecutor();
+    private final AtomicBoolean installing = new AtomicBoolean(false);
     private volatile int pid = -1;
     private volatile int fd = -1;
     private final AtomicBoolean reaped = new AtomicBoolean(true);
 
+    private RootfsInstaller installer() {
+        return new RootfsInstaller(getContext().getFilesDir());
+    }
+
+    /** Reports whether the Linux root filesystem is in place. */
+    @PluginMethod
+    public void status(PluginCall call) {
+        JSObject result = new JSObject();
+        result.put("installed", installer().isInstalled());
+        call.resolve(result);
+    }
+
+    /**
+     * Downloads and installs the root filesystem. Runs off the UI thread.
+     * Events: install { stage, percent }. Rejects with INSTALL_FAILED or INSTALL_RUNNING.
+     */
+    @PluginMethod
+    public void install(PluginCall call) {
+        RootfsInstaller rootfs = installer();
+        if (rootfs.isInstalled()) {
+            call.resolve();
+            return;
+        }
+        if (!installing.compareAndSet(false, true)) {
+            call.reject("Installation is already running", "INSTALL_RUNNING");
+            return;
+        }
+        Thread worker = new Thread(() -> {
+            try {
+                rootfs.install((stage, percent) -> {
+                    JSObject ev = new JSObject();
+                    ev.put("stage", stage);
+                    ev.put("percent", percent);
+                    notifyListeners("install", ev);
+                });
+                call.resolve();
+            } catch (Exception e) {
+                Log.e(TAG, "Linux install failed", e);
+                String msg = e.getMessage() != null ? e.getMessage() : e.getClass().getSimpleName();
+                call.reject("Install failed: " + msg, "INSTALL_FAILED");
+            } finally {
+                installing.set(false);
+            }
+        }, "linux-install");
+        worker.setDaemon(true);
+        worker.start();
+    }
+
     @PluginMethod
     public void start(PluginCall call) {
         File filesDir = getContext().getFilesDir();
-        File rootfs = new File(filesDir, ROOTFS_REL);
-        if (!new File(rootfs, "bin/sh").exists()) {
+        if (!installer().isInstalled()) {
             call.reject("Linux is not installed yet", "NOT_INSTALLED");
             return;
         }
+        File rootfs = installer().rootfsDir();
         int cols = call.getInt("cols", 80);
         int rows = call.getInt("rows", 24);
 
