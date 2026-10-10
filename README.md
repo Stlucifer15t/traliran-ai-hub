@@ -168,3 +168,12 @@ Checkpoints: every message you send to the agent records a checkpoint. After the
 Rules, memory and skills: the Rules button in the agent header opens a panel. Global rules and AGENTS.md (project root) are added to every agent prompt. The agent saves notes with remember, removes them with forget, and reads a skill with load_skill when it needs it. Everything is stored on the device. Prompt files and the grouping follow AiCode (GPL-3.0, see THIRD_PARTY_NOTICES.md).
 
 Sub-agents: the agent can call spawn_subagent(agent, task). The sub-agent runs in its own context with a short tool loop (at most 6 model turns) and returns one report, so the main chat stays short. The built-in explore agent is read-only. Custom sub-agents (name, prompt, tools, optional model) are added in the Rules panel. Sub-agents cannot start sub-agents, and every tool they use goes through the PLAN gate.
+
+## Container & images (AiCode direction)
+
+The Linux terminal has a **Images** button. It opens a Container & images panel:
+
+- **Installed** lists the images on the device. The active one runs in the next shell. Switching stops the current shell. Built-in images cannot be deleted, and neither can the active image.
+- **Download** lists Alpine 3.21 to 3.24, Ubuntu 20.04, 22.04 and 24.04, and Debian 12 and 13. Debian is listed but disabled until `.tar.xz` support is added.
+
+Each image is stored in its own folder under the app's private storage. Downloads come only from `dl-cdn.alpinelinux.org` and `cdimage.ubuntu.com`, over https, and each one must match its published SHA-256 checksum before it is unpacked. The image list follows AiCode (GPL-3.0). See `THIRD_PARTY_NOTICES.md`.

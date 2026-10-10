@@ -17,9 +17,13 @@ import java.net.URL;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
+import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.regex.Pattern;
 import java.util.zip.GZIPInputStream;
 
 /**
@@ -32,6 +36,9 @@ import java.util.zip.GZIPInputStream;
  * The tar reader handles ustar, GNU long names and pax headers, and creates
  * directories, regular files, symlinks and hard links. Device nodes and other
  * special entries are skipped. Paths that escape the root are rejected.
+ *
+ * Several images are supported. The image list follows AiCode's container image manager
+ * (GPL-3.0, see THIRD_PARTY_NOTICES.md).
  */
 final class RootfsInstaller {
 
@@ -39,84 +46,207 @@ final class RootfsInstaller {
         void update(String stage, int percent);
     }
 
+    /** The image that ships with the app: Alpine 3.23.3 aarch64, installed at linux/rootfs. */
+    static final String BUILTIN_ID = "builtin";
     static final String ALPINE_BRANCH = "v3.23";
     static final String VERSION = "3.23.3";
     static final String BASE_URL = "https://dl-cdn.alpinelinux.org/alpine/" + ALPINE_BRANCH + "/releases/aarch64/";
     static final String TARBALL = "alpine-minirootfs-" + VERSION + "-aarch64.tar.gz";
 
-    private final File linuxDir;
+    /** Hosts an image may be downloaded from. Anything else is refused. */
+    static final List<String> ALLOWED_HOSTS = Arrays.asList("dl-cdn.alpinelinux.org", "cdimage.ubuntu.com");
+    private static final Pattern IMAGE_ID = Pattern.compile("[a-z0-9][a-z0-9.-]{0,39}");
 
-    RootfsInstaller(File filesDir) {
-        this.linuxDir = new File(filesDir, "linux");
+    /**
+     * One downloadable root filesystem. checksumListed is true when checksumUrl is a
+     * "hash  filename" list (Ubuntu SHA256SUMS) and false when it is a one-hash file (Alpine .sha256).
+     * apkBranch is empty for images without apk (Ubuntu).
+     */
+    static final class Source {
+        final String id;
+        final String distro;
+        final String tarballUrl;
+        final String checksumUrl;
+        final boolean checksumListed;
+        final String apkBranch;
+
+        Source(String id, String distro, String tarballUrl, String checksumUrl, boolean checksumListed, String apkBranch) {
+            this.id = id;
+            this.distro = distro;
+            this.tarballUrl = tarballUrl;
+            this.checksumUrl = checksumUrl;
+            this.checksumListed = checksumListed;
+            this.apkBranch = apkBranch;
+        }
+
+        String fileName() {
+            return tarballUrl.substring(tarballUrl.lastIndexOf('/') + 1);
+        }
+    }
+
+    static Source builtinSource() {
+        return new Source(BUILTIN_ID, "alpine", BASE_URL + TARBALL, BASE_URL + TARBALL + ".sha256", false, ALPINE_BRANCH);
+    }
+
+    private final File linuxDir;
+    private final String imageId;
+
+    RootfsInstaller(File filesDir, String imageId) {
+        this.linuxDir = linuxDirOf(filesDir);
+        this.imageId = imageId == null ? BUILTIN_ID : imageId;
+    }
+
+    static File linuxDirOf(File filesDir) {
+        return new File(filesDir, "linux");
+    }
+
+    static boolean validId(String id) {
+        return id != null && (BUILTIN_ID.equals(id) || IMAGE_ID.matcher(id).matches());
+    }
+
+    /** Id of the image Linux runs in. Defaults to the built-in image. */
+    static String activeId(File linuxDir) {
+        File f = new File(linuxDir, "active");
+        if (!f.isFile()) return BUILTIN_ID;
+        try (InputStream in = new FileInputStream(f)) {
+            String id = new String(readAll(in), StandardCharsets.US_ASCII).trim();
+            return validId(id) ? id : BUILTIN_ID;
+        } catch (IOException e) {
+            return BUILTIN_ID;
+        }
+    }
+
+    static void setActive(File linuxDir, String id) throws IOException {
+        if (!validId(id)) throw new IOException("Unknown image id");
+        //noinspection ResultOfMethodCallIgnored
+        linuxDir.mkdirs();
+        writeText(new File(linuxDir, "active"), id);
+    }
+
+    /** Ids of every image whose root filesystem is in place. */
+    static List<String> installedIds(File linuxDir) {
+        List<String> ids = new ArrayList<>();
+        if (rootfsReady(new File(linuxDir, "rootfs"))) ids.add(BUILTIN_ID);
+        File[] dirs = new File(linuxDir, "images").listFiles();
+        if (dirs != null) {
+            for (File d : dirs) {
+                if (d.isDirectory() && IMAGE_ID.matcher(d.getName()).matches() && rootfsReady(new File(d, "rootfs"))) {
+                    ids.add(d.getName());
+                }
+            }
+        }
+        return ids;
+    }
+
+    static void deleteImage(File linuxDir, String id) throws IOException {
+        if (!IMAGE_ID.matcher(id).matches() || BUILTIN_ID.equals(id)) throw new IOException("This image cannot be deleted");
+        deleteRecursively(new File(new File(linuxDir, "images"), id));
+    }
+
+    /** True when the root filesystem has a shell or an os-release. Both are checked as regular files. */
+    static boolean rootfsReady(File root) {
+        return new File(root, "etc/os-release").isFile() || new File(root, "bin/busybox").isFile();
+    }
+
+    private File imageDir() {
+        return BUILTIN_ID.equals(imageId) ? linuxDir : new File(new File(linuxDir, "images"), imageId);
     }
 
     File rootfsDir() {
-        return new File(linuxDir, "rootfs");
+        return new File(imageDir(), "rootfs");
     }
 
     /**
      * bin/sh is a symlink to /bin/busybox with an absolute target. File.exists() follows that
      * link on the phone's own filesystem, where /bin/busybox does not exist, so check the
-     * regular file that the link points to.
+     * regular files instead.
      */
     boolean isInstalled() {
-        return new File(rootfsDir(), "bin/busybox").isFile();
+        return rootfsReady(rootfsDir());
     }
 
-    void install(Progress progress) throws IOException {
+    static void checkHost(String url) throws IOException {
+        URL u = new URL(url);
+        if (!"https".equals(u.getProtocol()) || !ALLOWED_HOSTS.contains(u.getHost())) {
+            throw new IOException("Download host not allowed: " + u.getHost());
+        }
+    }
+
+    void install(Source src, Progress progress) throws IOException {
         if (isInstalled()) return;
+        if (!src.id.equals(imageId)) throw new IOException("Source does not match this image");
+        checkHost(src.tarballUrl);
+        checkHost(src.checksumUrl);
 
         File downloads = new File(linuxDir, "download");
         //noinspection ResultOfMethodCallIgnored
         downloads.mkdirs();
-        File tarball = new File(downloads, TARBALL);
+        String fileName = src.fileName();
+        File tarball = new File(downloads, fileName);
 
         progress.update("checksum", 0);
-        String expected = fetchChecksum();
+        String expected = fetchChecksum(src.checksumUrl, src.checksumListed, fileName);
 
         if (!tarball.isFile() || !expected.equals(sha256(tarball))) {
-            download(BASE_URL + TARBALL, tarball, progress);
+            download(src.tarballUrl, tarball, progress);
         }
         progress.update("verify", 100);
         if (!expected.equals(sha256(tarball))) {
             //noinspection ResultOfMethodCallIgnored
             tarball.delete();
-            throw new IOException("Checksum mismatch for " + TARBALL + "; the download was discarded");
+            throw new IOException("Checksum mismatch for " + fileName + "; the download was discarded");
         }
 
-        File partial = new File(linuxDir, "rootfs.partial");
+        File partial = new File(imageDir(), "rootfs.partial");
         deleteRecursively(partial);
         //noinspection ResultOfMethodCallIgnored
         partial.mkdirs();
         progress.update("extract", 0);
         try (InputStream in = new GZIPInputStream(new BufferedInputStream(new FileInputStream(tarball), 65536))) {
             extract(in, partial);
-            writeDefaults(partial);
+            writeDefaults(partial, src);
         } catch (IOException | RuntimeException e) {
             deleteRecursively(partial);
             throw e;
         }
 
-        deleteRecursively(rootfsDir());
-        if (!partial.renameTo(rootfsDir())) {
+        File target = rootfsDir();
+        deleteRecursively(target);
+        if (!partial.renameTo(target)) {
             deleteRecursively(partial);
             throw new IOException("Could not move the root filesystem into place");
         }
         if (!isInstalled()) {
-            throw new IOException("The archive did not contain bin/busybox; the install is incomplete");
+            throw new IOException("The archive did not contain a root filesystem; the install is incomplete");
         }
         progress.update("done", 100);
     }
 
     // ---- download and verification -------------------------------------------------
 
-    private static String fetchChecksum() throws IOException {
-        HttpURLConnection c = open(new URL(BASE_URL + TARBALL + ".sha256"));
+    // ---- download and verification -------------------------------------------------
+
+    /**
+     * Reads the expected SHA-256 for fileName. For a listed file, finds the line that names it.
+     * For a one-hash file, reads the first token. Throws if no valid hash is found.
+     */
+    private static String fetchChecksum(String url, boolean listed, String fileName) throws IOException {
+        HttpURLConnection c = open(new URL(url));
         try (InputStream in = c.getInputStream()) {
-            String text = new String(readAll(in), StandardCharsets.US_ASCII).trim();
-            String hash = text.split("\\s+")[0].toLowerCase(Locale.ROOT);
-            if (!hash.matches("[0-9a-f]{64}")) throw new IOException("Unexpected checksum file from the mirror");
-            return hash;
+            String text = new String(readAll(in), StandardCharsets.US_ASCII);
+            if (!listed) {
+                String hash = text.trim().split("\\s+")[0].toLowerCase(Locale.ROOT);
+                if (!hash.matches("[0-9a-f]{64}")) throw new IOException("Unexpected checksum file from the mirror");
+                return hash;
+            }
+            for (String line : text.split("\r?\n")) {
+                String[] parts = line.trim().split("\\s+");
+                if (parts.length < 2) continue;
+                String name = parts[parts.length - 1].replaceFirst("^\\*", "");
+                String hash = parts[0].toLowerCase(Locale.ROOT);
+                if (name.equals(fileName) && hash.matches("[0-9a-f]{64}")) return hash;
+            }
+            throw new IOException("The published checksum list has no entry for " + fileName);
         } finally {
             c.disconnect();
         }
@@ -322,18 +452,23 @@ final class RootfsInstaller {
         return out;
     }
 
-    private static void writeDefaults(File root) throws IOException {
-        //noinspection ResultOfMethodCallIgnored
-        new File(root, "etc/apk").mkdirs();
+    /** Writes DNS and hosts files. Alpine images also get apk repositories; Ubuntu images do not use apk. */
+    private static void writeDefaults(File root, Source src) throws IOException {
         //noinspection ResultOfMethodCallIgnored
         new File(root, "root").mkdirs();
         //noinspection ResultOfMethodCallIgnored
         new File(root, "tmp").mkdirs();
+        //noinspection ResultOfMethodCallIgnored
+        new File(root, "etc").mkdirs();
         writeText(new File(root, "etc/resolv.conf"), "nameserver 1.1.1.1\nnameserver 8.8.8.8\n");
         writeText(new File(root, "etc/hosts"), "127.0.0.1 localhost\n");
-        writeText(new File(root, "etc/apk/repositories"),
-            "https://dl-cdn.alpinelinux.org/alpine/" + ALPINE_BRANCH + "/main\n"
-            + "https://dl-cdn.alpinelinux.org/alpine/" + ALPINE_BRANCH + "/community\n");
+        if (src.apkBranch != null && !src.apkBranch.isEmpty()) {
+            //noinspection ResultOfMethodCallIgnored
+            new File(root, "etc/apk").mkdirs();
+            writeText(new File(root, "etc/apk/repositories"),
+                "https://dl-cdn.alpinelinux.org/alpine/" + src.apkBranch + "/main\n"
+                + "https://dl-cdn.alpinelinux.org/alpine/" + src.apkBranch + "/community\n");
+        }
     }
 
     private static void writeText(File f, String text) throws IOException {

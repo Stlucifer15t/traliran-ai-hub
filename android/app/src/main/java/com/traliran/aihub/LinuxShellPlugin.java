@@ -1,5 +1,7 @@
 package com.traliran.aihub;
 
+import java.io.IOException;
+import com.getcapacitor.JSArray;
 import android.util.Base64;
 import android.util.Log;
 import com.getcapacitor.JSObject;
@@ -78,8 +80,10 @@ public class LinuxShellPlugin extends Plugin {
         }
     }
 
+    /** Installer for the active image: start, run and MCP use its root filesystem. */
     private RootfsInstaller installer() {
-        return new RootfsInstaller(getContext().getFilesDir());
+        File filesDir = getContext().getFilesDir();
+        return new RootfsInstaller(filesDir, RootfsInstaller.activeId(RootfsInstaller.linuxDirOf(filesDir)));
     }
 
     // ---- install and status ---------------------------------------------------------
@@ -88,13 +92,38 @@ public class LinuxShellPlugin extends Plugin {
     public void status(PluginCall call) {
         JSObject result = new JSObject();
         result.put("installed", installer().isInstalled());
+        result.put("active", RootfsInstaller.activeId(RootfsInstaller.linuxDirOf(getContext().getFilesDir())));
         call.resolve(result);
     }
 
-    /** Downloads and installs the root filesystem. Runs off the UI thread. */
+    /**
+     * Downloads and installs an image. With no id (or "builtin") it installs the built-in
+     * Alpine. Otherwise the JS side passes the download addresses from its image catalog,
+     * and the host must be on the allow-list in RootfsInstaller. Runs off the UI thread.
+     */
     @PluginMethod
     public void install(PluginCall call) {
-        RootfsInstaller rootfs = installer();
+        File filesDir = getContext().getFilesDir();
+        String id = call.getString("id", RootfsInstaller.BUILTIN_ID);
+        if (!RootfsInstaller.validId(id)) {
+            call.reject("Unknown image id", "BAD_IMAGE");
+            return;
+        }
+        RootfsInstaller.Source src;
+        if (RootfsInstaller.BUILTIN_ID.equals(id)) {
+            src = RootfsInstaller.builtinSource();
+        } else {
+            String tarball = call.getString("tarballUrl", "");
+            String checksum = call.getString("checksumUrl", "");
+            Boolean listed = call.getBoolean("checksumListed", false);
+            if (tarball.isEmpty() || checksum.isEmpty()) {
+                call.reject("This image has no download address", "BAD_IMAGE");
+                return;
+            }
+            src = new RootfsInstaller.Source(id, call.getString("distro", ""), tarball, checksum,
+                listed != null && listed, call.getString("apkBranch", ""));
+        }
+        RootfsInstaller rootfs = new RootfsInstaller(filesDir, id);
         if (rootfs.isInstalled()) {
             call.resolve();
             return;
@@ -105,7 +134,7 @@ public class LinuxShellPlugin extends Plugin {
         }
         Thread worker = new Thread(() -> {
             try {
-                rootfs.install((stage, percent) -> {
+                rootfs.install(src, (stage, percent) -> {
                     JSObject ev = new JSObject();
                     ev.put("stage", stage);
                     ev.put("percent", percent);
@@ -122,6 +151,52 @@ public class LinuxShellPlugin extends Plugin {
         }, "linux-install");
         worker.setDaemon(true);
         worker.start();
+    }
+
+    /** Installed images and the active one. */
+    @PluginMethod
+    public void images(PluginCall call) {
+        File linuxDir = RootfsInstaller.linuxDirOf(getContext().getFilesDir());
+        JSArray ids = new JSArray();
+        for (String id : RootfsInstaller.installedIds(linuxDir)) ids.put(id);
+        JSObject result = new JSObject();
+        result.put("installed", ids);
+        result.put("active", RootfsInstaller.activeId(linuxDir));
+        call.resolve(result);
+    }
+
+    /** Makes an installed image the one Linux runs in. Takes effect for the next shell. */
+    @PluginMethod
+    public void setActive(PluginCall call) {
+        File linuxDir = RootfsInstaller.linuxDirOf(getContext().getFilesDir());
+        String id = call.getString("id", "");
+        if (!RootfsInstaller.installedIds(linuxDir).contains(id)) {
+            call.reject("That image is not installed", "NOT_INSTALLED");
+            return;
+        }
+        try {
+            RootfsInstaller.setActive(linuxDir, id);
+            call.resolve();
+        } catch (IOException e) {
+            call.reject("Could not switch image: " + e.getMessage(), "SET_FAILED");
+        }
+    }
+
+    /** Deletes an installed image. The built-in image and the active image cannot be deleted. */
+    @PluginMethod
+    public void deleteImage(PluginCall call) {
+        File linuxDir = RootfsInstaller.linuxDirOf(getContext().getFilesDir());
+        String id = call.getString("id", "");
+        if (id.equals(RootfsInstaller.activeId(linuxDir))) {
+            call.reject("Switch to another image before deleting this one", "IS_ACTIVE");
+            return;
+        }
+        try {
+            RootfsInstaller.deleteImage(linuxDir, id);
+            call.resolve();
+        } catch (IOException e) {
+            call.reject("Could not delete the image: " + e.getMessage(), "DELETE_FAILED");
+        }
     }
 
     // ---- shared command setup ---------------------------------------------------------

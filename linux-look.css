@@ -161,16 +161,16 @@ input, select {
 }
 
 /* Projects panel */
-#projects .row { display: flex; gap: .5rem; margin-bottom: .6rem; }
-#projects input { flex: 1; }
-#projects .list {
+#projects .row, #images .row { display: flex; gap: .5rem; margin-bottom: .6rem; }
+#projects input, #images input { flex: 1; }
+#projects .list, #images .list {
     max-height: 36vh;
     overflow: auto;
     border: 1px solid var(--lk-border);
     border-radius: var(--lk-radius);
     margin-bottom: .6rem;
 }
-#projects .item {
+#projects .item, #images .item {
     display: flex;
     justify-content: space-between;
     align-items: center;
@@ -179,21 +179,21 @@ input, select {
     border-bottom: 1px solid var(--lk-border);
     font-size: .9rem;
 }
-#projects .item small {
+#projects .item small, #images .item small {
     color: var(--lk-muted);
     display: block;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
 }
-#projects .item > div { min-width: 0; }
-#projects .status {
+#projects .item > div, #images .item > div { min-width: 0; }
+#projects .status, #images .status {
     white-space: pre-wrap;
     font: .78rem/1.4 var(--lk-mono);
     color: var(--lk-muted);
     min-height: 1rem;
 }
-#projects.hidden { display: none; }
+#projects.hidden, #images.hidden { display: none; }
 #unsupported { margin: 1.5rem 1rem; color: var(--lk-muted); line-height: 1.5; }
 
 /* Workspace */
@@ -282,3 +282,6 @@ nav.tabbar > .on {
     color: var(--lk-accent-ink);
     background: var(--lk-accent);
 }
+
+/* Images panel: descriptions wrap instead of truncating. */
+#images .item small { white-space: normal; overflow: visible; text-overflow: clip; }

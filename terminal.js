@@ -41,6 +41,12 @@
     term.loadAddon(fit);
     term.open(el.termWrap);
 
+    const imgEls = {
+        imagesBtn: $('imagesBtn'), images: $('images'), imgList: $('imgList'),
+        imgStatus: $('imgStatus'), closeImagesBtn: $('closeImagesBtn'),
+    };
+    let imageBusy = false;
+
     function bytesToB64(bytes) {
         let s = '';
         for (let i = 0; i < bytes.length; i += 0x8000) {
@@ -114,7 +120,8 @@
         el.termWrap.classList.toggle('hidden', !on);
         el.keys.classList.toggle('hidden', !on);
         el.setup.classList.toggle('hidden', on);
-        el.projects.classList.toggle('hidden', on);
+        el.projects.classList.add('hidden');
+        imgEls.images.classList.add('hidden');
         if (on) {
             refit();
             term.focus();
@@ -162,7 +169,7 @@
         el.installBtn.disabled = true;
         el.barWrap.hidden = false;
         try {
-            await LS.install();
+            await LS.install(LinuxImages.installArgs(LinuxImages.find('builtin')));
             el.stage.textContent = '';
             el.barWrap.hidden = true;
             await startSession();
@@ -189,10 +196,11 @@
         LS.addListener('install', (ev) => {
             el.stage.textContent = STAGES[ev.stage] || ev.stage;
             el.bar.style.width = (ev.percent || 0) + '%';
+            if (imageBusy) imgEls.imgStatus.textContent = (STAGES[ev.stage] || ev.stage) + ' ' + (ev.percent || 0) + '%';
         });
     }
 
-    el.installBtn.addEventListener('click', install);
+    el.installBtn.addEventListener('click', () => install());
     el.restartBtn.addEventListener('click', () => startSession());
     el.stopBtn.addEventListener('click', async () => {
         if (LS) await LS.stop().catch(() => {});
@@ -276,8 +284,151 @@
         }
     }
 
+    // ---- container and images ----------------------------------------------------------
+
+    function imgRow(title, detail, pills, actions) {
+        const row = document.createElement('div');
+        row.className = 'item';
+        const text = document.createElement('div');
+        const strong = document.createElement('strong');
+        strong.textContent = title;
+        for (const p of pills) {
+            const span = document.createElement('span');
+            span.className = 'pill ' + p.kind;
+            span.textContent = p.text;
+            strong.append(' ', span);
+        }
+        text.appendChild(strong);
+        const small = document.createElement('small');
+        small.textContent = detail;
+        small.style.whiteSpace = 'normal';
+        text.appendChild(small);
+        const right = document.createElement('div');
+        right.style.display = 'flex';
+        right.style.gap = '.4rem';
+        right.style.flexShrink = '0';
+        for (const a of actions) right.appendChild(a);
+        row.append(text, right);
+        return row;
+    }
+
+    function imgButton(label, onClick, disabled, primary) {
+        const b = document.createElement('button');
+        b.className = 'btn' + (primary ? ' btn-primary' : '');
+        b.textContent = label;
+        b.disabled = !!disabled;
+        b.addEventListener('click', onClick);
+        return b;
+    }
+
+    function setImgStatus(text) {
+        imgEls.imgStatus.textContent = text;
+    }
+
+    async function refreshImages() {
+        let state;
+        try {
+            state = await LS.images();
+        } catch (e) {
+            setImgStatus(e.message || String(e));
+            return;
+        }
+        const installed = new Set(state.installed || []);
+        const active = state.active || 'builtin';
+        imgEls.imgList.innerHTML = '';
+
+        const head1 = document.createElement('small');
+        head1.textContent = 'Installed';
+        head1.style.display = 'block';
+        head1.style.padding = '.5rem .7rem 0';
+        imgEls.imgList.appendChild(head1);
+        for (const img of LinuxImages.CATALOG.filter(i => installed.has(i.id))) {
+            const isActive = img.id === active;
+            const pills = [];
+            if (img.builtin) pills.push({ text: 'Built-in', kind: '' });
+            if (isActive) pills.push({ text: 'Active', kind: 'ok' });
+            const actions = [];
+            if (!isActive) actions.push(imgButton('Use', () => useImage(img), imageBusy, true));
+            if (!isActive && !img.builtin) actions.push(imgButton('Delete', () => deleteImage(img), imageBusy));
+            imgEls.imgList.appendChild(imgRow(img.name + ' ' + img.version, img.description, pills, actions));
+        }
+
+        const head2 = document.createElement('small');
+        head2.textContent = 'Download';
+        head2.style.display = 'block';
+        head2.style.padding = '.5rem .7rem 0';
+        imgEls.imgList.appendChild(head2);
+        for (const img of LinuxImages.CATALOG.filter(i => !installed.has(i.id))) {
+            const pills = [];
+            if (!img.supported) pills.push({ text: 'Not yet', kind: 'warn' });
+            const detail = img.description + ' About ' + img.sizeMB + ' MB.' + (img.supported ? '' : ' ' + img.unsupportedReason);
+            const actions = [imgButton('Download', () => downloadImage(img), imageBusy || !img.supported, true)];
+            imgEls.imgList.appendChild(imgRow(img.name + ' ' + img.version, detail, pills, actions));
+        }
+    }
+
+    async function downloadImage(img) {
+        imageBusy = true;
+        setImgStatus('Downloading ' + img.name + ' ' + img.version + '…');
+        refreshImages();
+        try {
+            await LS.install(LinuxImages.installArgs(img));
+            setImgStatus(img.name + ' ' + img.version + ' is downloaded. Tap Use to switch to it.');
+        } catch (e) {
+            setImgStatus('Download failed: ' + (e.message || String(e)));
+        } finally {
+            imageBusy = false;
+            refreshImages();
+        }
+    }
+
+    async function useImage(img) {
+        imageBusy = true;
+        refreshImages();
+        try {
+            if (running) await LS.stop().catch(() => {});
+            running = false;
+            await LS.setActive({ id: img.id });
+            setImgStatus('Using ' + img.name + ' ' + img.version + '. Starting the shell…');
+            imageBusy = false;
+            await startSession();
+        } catch (e) {
+            setImgStatus('Could not switch: ' + (e.message || String(e)));
+        } finally {
+            imageBusy = false;
+        }
+    }
+
+    async function deleteImage(img) {
+        if (!window.confirm('Delete ' + img.name + ' ' + img.version + '? Its files are removed from the device.')) return;
+        try {
+            await LS.deleteImage({ id: img.id });
+            setImgStatus('Deleted ' + img.name + ' ' + img.version + '.');
+        } catch (e) {
+            setImgStatus(e.message || String(e));
+        }
+        refreshImages();
+    }
+
+    function showImages() {
+        el.termWrap.classList.add('hidden');
+        el.keys.classList.add('hidden');
+        el.setup.classList.add('hidden');
+        el.projects.classList.add('hidden');
+        imgEls.images.classList.remove('hidden');
+        setImgStatus('');
+        refreshImages();
+    }
+
+    function wireImages() {
+        imgEls.imagesBtn.hidden = false;
+        imgEls.imagesBtn.addEventListener('click', showImages);
+        imgEls.closeImagesBtn.addEventListener('click', () => showTerminal(!!running));
+    }
+
     function wireProjects() {
         el.projectsBtn.hidden = false;
+        wireImages();
         el.wsLink.hidden = false;
         el.projectsBtn.addEventListener('click', async () => {
             showProjects();

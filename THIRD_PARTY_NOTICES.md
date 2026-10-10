@@ -31,3 +31,13 @@ Traliran AI Hub is licensed under AGPL-3.0 (see `LICENSE`). GPL-3.0 and AGPL-3.0
 are designed to be compatible, so GPL-3.0 material from AiCode can be combined
 into this AGPL-3.0 project. This is our reading of the licences, not legal
 advice. Copyright notices of copied material are kept with it.
+
+## Container image list (AiCode)
+
+- `linux-images.js` follows the distribution, version and sizes in AiCode's
+  `app/src/main/assets/container-images.json` (jieapi/AiCode, GPL-3.0). The
+  download paths follow the same pattern. Descriptions are written for this
+  project. No AiCode asset is copied.
+- `android/app/src/main/java/com/traliran/aihub/RootfsInstaller.java` supports
+  several images, which is the same idea as AiCode's container image manager.
+  The code is written for this project.

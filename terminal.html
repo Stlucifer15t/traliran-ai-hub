@@ -20,6 +20,7 @@
         </div>
         <div style="display:flex;gap:.4rem">
             <button id="projectsBtn" class="btn" hidden>Projects</button>
+            <button id="imagesBtn" class="btn" hidden>Images</button>
             <button id="restartBtn" class="btn" hidden>New shell</button>
             <button id="stopBtn" class="btn" hidden>Stop</button>
         </div>
@@ -60,6 +61,14 @@
         <div class="row"><button id="closeProjectsBtn" class="btn">Back to terminal</button></div>
     </section>
 
+    <section id="images" class="card hidden" aria-label="Container and images">
+        <h2>Container &amp; images</h2>
+        <p>Each image is a separate Linux root filesystem. The active one runs in the next shell you open. Switching stops the current shell.</p>
+        <div id="imgList" class="list"></div>
+        <div id="imgStatus" class="status"></div>
+        <div class="row"><button id="closeImagesBtn" class="btn">Back to terminal</button></div>
+    </section>
+
     <div id="term-wrap" class="hidden"></div>
 
     <div id="keys" class="hidden" aria-label="Terminal keys">
@@ -86,6 +95,7 @@
     <script src="vendor/xterm/addon-fit.js"></script>
     <script src="vault.js"></script>
     <script src="github-import.js"></script>
+    <script src="linux-images.js"></script>
     <script src="terminal.js"></script>
 </body>
 </html>
