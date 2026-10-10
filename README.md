@@ -162,3 +162,5 @@ The app-wide palette now follows the same direction: graphite surfaces, a green 
 The chat composer is now one rounded input bar, with attach and camera as icon chips (AiCode direction).
 
 Agent modes (Build, Plan, Auto) are set from the button in the agent header. Plan is read-only: the tool loop blocks every tool except list_files and read_file. Auto runs run_command without the approval wait, limited to /root/projects; the command card still shows the output. "Plan first" is a separate setting.
+
+Checkpoints: every message you send to the agent records a checkpoint. After the agent changes files, the review card has "Undo code and chat" (restores the files the turn changed and cuts the chat back to where it was) and "Undo chat only". Checkpoints are kept for the last 30 messages. Renames are not tracked yet.

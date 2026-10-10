@@ -981,6 +981,17 @@ function loadAgentSessionsFromStorage() {
     }
 }
 
+/** Cuts a chat back to chatLength messages (checkpoint restore). Refused while the agent runs. */
+function restoreAgentChatTo(sessionId, chatLength) {
+    if (isAgentProcessing) return false;
+    const session = agentSessions.find(s => s.id === sessionId);
+    if (!session) return false;
+    session.messages = session.messages.slice(0, Math.max(0, chatLength));
+    saveAgentSessionsToStorage();
+    if (session.id === currentAgentSessionId) loadActiveAgentSession();
+    return true;
+}
+
 function loadActiveAgentSession() {
     if (!agentChatWindow) return;
     const session = getActiveAgentSession();
@@ -1146,6 +1157,9 @@ const AI_AGENT = {
         
         isAgentProcessing = true;
         agentAbortController = new AbortController();
+        if (window.ChangeReview && !opts.resend) {
+            ChangeReview.beginTurn({ sessionId: session.id, chatLength: session.messages.length, label: text || (agentAttachedName || '') });
+        }
         if (typeof sendAgentBtn !== 'undefined' && sendAgentBtn) sendAgentBtn.classList.add('hidden');
         if (typeof stopAgentBtn !== 'undefined' && stopAgentBtn) stopAgentBtn.classList.remove('hidden');
 
@@ -2738,6 +2752,7 @@ async function init() {
     // Mobile layout, review toolbar, preview console, agent extras (all no-ops where not applicable).
     if (window.HubPlatform && HubPlatform.isMobile) MobileIDE.init();
     ChangeReview.bindToolbar();
+    ChangeReview.onRestoreChat = restoreAgentChatTo;
     PreviewConsole.bind({
         frame: previewFrame,
         panel: previewPanel,

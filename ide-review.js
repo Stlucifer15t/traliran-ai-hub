@@ -10,10 +10,13 @@
 
     const LOG_KEY = 'ide_change_log';
     const MAX_GROUPS = 30;
+    const CKPT_KEY = 'ide_checkpoints';
+    const MAX_CHECKPOINTS = 30;
 
     let log = [];          // change groups, oldest first
     let turn = null;       // { id, groups: { path: group } } while an agent turn runs
     let lastTouched = [];  // paths changed in the last finished turn
+    let checkpoints = [];  // { id, sessionId, chatLength, label, ts, restored } one per sent message
 
     function uid() { return 'g' + Date.now().toString(36) + Math.random().toString(36).slice(2, 7); }
 
@@ -27,6 +30,16 @@
         STORAGE.setItem(LOG_KEY, JSON.stringify(log));
     }
 
+    function loadCheckpoints() {
+        try { checkpoints = JSON.parse(STORAGE.getItem(CKPT_KEY) || '[]'); } catch (e) { checkpoints = []; }
+        if (!Array.isArray(checkpoints)) checkpoints = [];
+    }
+
+    function saveCheckpoints() {
+        checkpoints = checkpoints.slice(-MAX_CHECKPOINTS);
+        STORAGE.setItem(CKPT_KEY, JSON.stringify(checkpoints));
+    }
+
     function isActive(group) { return group.status === 'pending' || group.status === 'accepted'; }
 
     /** True when no newer active change touches the same file (safe to restore). */
@@ -35,8 +48,57 @@
         return !log.slice(idx + 1).some(g2 => g2.path === group.path && isActive(g2));
     }
 
-    function beginTurn() {
+    /** Starts a turn. meta = { sessionId, chatLength, label } records a checkpoint for this message. */
+    function beginTurn(meta) {
         turn = { id: uid(), groups: {} };
+        if (meta && meta.sessionId) {
+            checkpoints.push({
+                id: turn.id,
+                sessionId: meta.sessionId,
+                chatLength: Math.max(0, Number(meta.chatLength) || 0),
+                label: String(meta.label || '').slice(0, 80),
+                ts: Date.now(),
+                restored: false,
+            });
+            saveCheckpoints();
+        }
+    }
+
+    /**
+     * Restores a checkpoint: code undoes every active change from that turn (newest first),
+     * chat cuts the session back to the message count saved when the message was sent.
+     */
+    async function restoreCheckpoint(id, opts) {
+        const ck = checkpoints.find(c => c.id === id);
+        if (!ck) return { ok: false, reason: 'Checkpoint not found.' };
+        const wantCode = !!(opts && opts.code);
+        const wantChat = !!(opts && opts.chat);
+        let codeUndone = 0;
+        const conflicts = [];
+        if (wantCode) {
+            for (let i = log.length - 1; i >= 0; i--) {
+                const grp = log[i];
+                if (grp.turnId !== id || !isActive(grp)) continue;
+                if (!isLatestForPath(grp)) { conflicts.push(grp.path); continue; }
+                await restore(grp);
+                grp.status = 'undone';
+                codeUndone++;
+            }
+            save();
+        }
+        let chatRestored = false;
+        if (wantChat && typeof g.ChangeReview.onRestoreChat === 'function') {
+            chatRestored = g.ChangeReview.onRestoreChat(ck.sessionId, ck.chatLength) !== false;
+        }
+        ck.restored = true;
+        saveCheckpoints();
+        if (conflicts.length) {
+            return { ok: false, reason: 'Newer changes touch ' + conflicts.join(', ') + '. Undo those first.', codeUndone, chatRestored };
+        }
+        if (wantChat && !chatRestored) {
+            return { ok: false, reason: 'Chat cannot be restored while the agent is running.', codeUndone, chatRestored };
+        }
+        return { ok: true, codeUndone, chatRestored };
     }
 
     /** Writes an AI change: remembers the previous content first. */
@@ -207,6 +269,21 @@
             })
         );
         card.appendChild(bulk);
+        const ckId = groups[0] && groups[0].turnId;
+        if (checkpoints.some(c => c.id === ckId)) {
+            const ckRow = el('div', 'flex gap-2 pt-1 flex-wrap');
+            const runRestore = async (opts) => {
+                const res = await restoreCheckpoint(ckId, opts);
+                if (!res.ok) notifyStatus(res.reason);
+                else if (typeof notifyInfo === 'function') notifyInfo(opts.chat ? (opts.code ? 'Code and chat restored' : 'Chat restored') : 'Code restored');
+                refresh();
+            };
+            ckRow.append(
+                button('Undo code and chat', 'text-xs px-3 py-1.5 rounded bg-rose-800 text-white', () => runRestore({ code: true, chat: true })),
+                button('Undo chat only', 'text-xs px-3 py-1.5 rounded bg-gray-800 text-gray-200', () => runRestore({ chat: true }))
+            );
+            card.appendChild(ckRow);
+        }
         agentChatWindow.appendChild(card);
         agentChatWindow.scrollTop = agentChatWindow.scrollHeight;
         updateUndoButton();
@@ -240,9 +317,12 @@
     }
 
     load();
+    loadCheckpoints();
 
     g.ChangeReview = {
-        beginTurn, endTurn, write, accept, reject, undoLast, undoCount,
+        beginTurn, endTurn, write, accept, reject, undoLast, undoCount, restoreCheckpoint,
+        onRestoreChat: null,
+        checkpoints: () => checkpoints.slice(),
         updateUndoButton, bindToolbar,
         get lastTouched() { return lastTouched.slice(); },
         _log: () => log.slice()
