@@ -1280,6 +1280,8 @@ Be helpful, precise, and professional. All communication must be in English.`;
 
     async executeToolLoop(messages, provider, apiKey, model, endpoint, maxIterations = 10, opts = {}) {
         let iterations = 0;
+        // Sub-agents reuse this run's provider and model.
+        if (window.AgentSubagents) AgentSubagents.setRunContext({ provider, apiKey, model, endpoint });
         
         // Build tool definitions for system prompt
         const toolDescriptions = this.tools.map(t => {

@@ -851,3 +851,6 @@ input::placeholder, textarea::placeholder { color: #666E80; }
 .am-form { margin-top: .6rem; }
 .am-note { min-height: 1rem; font-size: .8rem; color: var(--accent-color); margin-top: .3rem; }
 .am-note.am-bad { color: #F87171; }
+
+.am-tools { display: flex; flex-wrap: wrap; gap: .35rem .9rem; margin-bottom: .5rem; font-size: .82rem; color: var(--text-main); }
+.am-check { display: inline-flex; align-items: center; gap: .25rem; cursor: pointer; }

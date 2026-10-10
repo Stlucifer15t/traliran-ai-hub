@@ -20,7 +20,8 @@
     const MODES = ['BUILD', 'PLAN', 'AUTO'];
     const LABELS = { BUILD: 'Build', PLAN: 'Plan', AUTO: 'Auto' };
     // Read tools, plus memory and skills (they change app storage, not project files).
-    const ALLOWED_IN_PLAN = new Set(['list_files', 'read_file', 'remember', 'forget', 'load_skill']);
+    // spawn_subagent is allowed: each tool a sub-agent uses is gated separately.
+    const ALLOWED_IN_PLAN = new Set(['list_files', 'read_file', 'remember', 'forget', 'load_skill', 'spawn_subagent']);
 
     function current() {
         let m = null;

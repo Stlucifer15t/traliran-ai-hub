@@ -111,6 +111,64 @@
         return wrap;
     }
 
+    function subagentsSection(refresh) {
+        const SA = g.AgentSubagents;
+        if (!SA) return section('Sub-agents', 'Not available in this build.');
+        const wrap = section('Sub-agents',
+            'A sub-agent works in its own context and returns one report to the chat. Built in: explore (read-only).');
+        for (const a of SA.listAgents()) {
+            const row = h('div', 'am-row');
+            const text = h('div', 'am-row-text');
+            text.appendChild(h('strong', '', a.name + (a.builtin ? ' (built in)' : '')));
+            text.appendChild(h('div', 'am-hint', a.description + ' Tools: ' + a.tools.join(', ') + (a.model ? '. Model: ' + a.model : '')));
+            row.appendChild(text);
+            if (!a.builtin) {
+                const del = h('button', 'am-btn am-danger', 'Delete');
+                del.type = 'button';
+                del.addEventListener('click', () => { SA.deleteCustom(a.id); refresh(); });
+                row.appendChild(del);
+            }
+            wrap.appendChild(row);
+        }
+        const form = h('div', 'am-form');
+        const name = h('input', 'am-input');
+        name.placeholder = 'name, e.g. test-writer';
+        name.maxLength = 40;
+        const desc = h('input', 'am-input');
+        desc.placeholder = 'What it is for, one line';
+        desc.maxLength = 160;
+        const prompt = h('textarea', 'am-input');
+        prompt.rows = 3;
+        prompt.placeholder = 'Instructions for this sub-agent';
+        prompt.maxLength = 4000;
+        const model = h('input', 'am-input');
+        model.placeholder = 'Model (optional; blank uses the main model)';
+        model.maxLength = 120;
+        const toolsWrap = h('div', 'am-tools');
+        const boxes = SA.availableTools().map(t => {
+            const lab = h('label', 'am-check');
+            const cb = h('input');
+            cb.type = 'checkbox';
+            cb.value = t;
+            lab.append(cb, document.createTextNode(' ' + t));
+            toolsWrap.appendChild(lab);
+            return cb;
+        });
+        const add = h('button', 'am-btn am-primary', 'Add sub-agent');
+        add.type = 'button';
+        add.addEventListener('click', () => {
+            const res = SA.saveCustom({
+                name: name.value, description: desc.value, prompt: prompt.value, model: model.value,
+                tools: boxes.filter(b => b.checked).map(b => b.value),
+            });
+            if (!res.ok) { note(wrap, res.error, true); return; }
+            refresh();
+        });
+        form.append(name, desc, prompt, model, toolsWrap, add);
+        wrap.append(form, h('div', 'am-note'));
+        return wrap;
+    }
+
     function open() {
         if (!M()) return;
         if (document.getElementById('amOverlay')) return;
@@ -141,7 +199,7 @@
 
         function render() {
             body.innerHTML = '';
-            body.append(rulesSection(), memorySection(render), skillsSection(render));
+            body.append(rulesSection(), memorySection(render), skillsSection(render), subagentsSection(render));
         }
         render();
         document.body.appendChild(overlay);
