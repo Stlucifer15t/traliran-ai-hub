@@ -41,3 +41,8 @@ advice. Copyright notices of copied material are kept with it.
 - `android/app/src/main/java/com/traliran/aihub/RootfsInstaller.java` supports
   several images, which is the same idea as AiCode's container image manager.
   The code is written for this project.
+
+## XZ for Java (org.tukaani:xz)
+
+- Used by the Android app to unpack `.tar.xz` rootfs archives (Debian).
+- Licence: public domain (see https://tukaani.org/xz/java.html).

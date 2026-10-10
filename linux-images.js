@@ -8,8 +8,8 @@
  *
  * Checksums: the native installer refuses an image whose checksum it cannot read.
  * Alpine publishes a .sha256 file next to each tarball. Ubuntu publishes SHA256SUMS in
- * each release directory. Debian's rootfs is .tar.xz, which the installer does not
- * read yet, so it is listed but disabled.
+ * each release directory. Debian's rootfs is .tar.xz, which the installer reads. Debian
+ * stays disabled until a checksum source for its download host is verified.
  */
 (function (g) {
     'use strict';
@@ -68,7 +68,7 @@
             distro: 'debian',
             sizeMB: 29,
             supported: false,
-            unsupportedReason: 'Needs .tar.xz support. Not available yet.',
+            unsupportedReason: 'Checksum source not verified yet.',
         };
     }
 

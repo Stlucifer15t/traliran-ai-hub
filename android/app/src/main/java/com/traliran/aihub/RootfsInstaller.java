@@ -26,6 +26,8 @@ import java.util.Map;
 import java.util.regex.Pattern;
 import java.util.zip.GZIPInputStream;
 
+import org.tukaani.xz.XZInputStream;
+
 /**
  * Installs the Alpine minirootfs (arm64) that the Linux shell runs in.
  *
@@ -172,6 +174,17 @@ final class RootfsInstaller {
         }
     }
 
+    /** Opens a rootfs archive: .tar.xz (Debian) or .tar.gz (Alpine, Ubuntu). */
+    static InputStream openArchive(File tarball, String fileName) throws IOException {
+        InputStream raw = new BufferedInputStream(new FileInputStream(tarball), 65536);
+        try {
+            return fileName.endsWith(".tar.xz") ? new XZInputStream(raw) : new GZIPInputStream(raw);
+        } catch (IOException e) {
+            raw.close();
+            throw e;
+        }
+    }
+
     void install(Source src, Progress progress) throws IOException {
         if (isInstalled()) return;
         if (!src.id.equals(imageId)) throw new IOException("Source does not match this image");
@@ -202,7 +215,7 @@ final class RootfsInstaller {
         //noinspection ResultOfMethodCallIgnored
         partial.mkdirs();
         progress.update("extract", 0);
-        try (InputStream in = new GZIPInputStream(new BufferedInputStream(new FileInputStream(tarball), 65536))) {
+        try (InputStream in = openArchive(tarball, fileName)) {
             extract(in, partial);
             writeDefaults(partial, src);
         } catch (IOException | RuntimeException e) {

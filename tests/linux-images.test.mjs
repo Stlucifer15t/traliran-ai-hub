@@ -46,12 +46,12 @@ test('Alpine images use a one-hash sidecar; Ubuntu images use a listed SHA256SUM
     }
 });
 
-test('Debian is listed but disabled until xz support exists', () => {
+test('Debian is listed but disabled until its checksum source is verified', () => {
     const deb = L.CATALOG.filter(i => i.distro === 'debian');
     assert.ok(deb.length >= 1);
     for (const img of deb) {
         assert.equal(img.supported, false);
-        assert.throws(() => L.installArgs(img), /Needs .tar.xz/);
+        assert.throws(() => L.installArgs(img), /not verified/);
     }
 });
 
