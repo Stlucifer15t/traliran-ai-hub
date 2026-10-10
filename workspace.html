@@ -8,52 +8,15 @@
     <link rel="stylesheet" href="vendor/tailwind.css">
     <link rel="stylesheet" href="theme-palette.css">
     <link rel="stylesheet" href="styles.css">
-    <style>
-        html, body { height: 100%; margin: 0; background: #0B0C10; color: #EDEFF4; }
-        body { display: flex; flex-direction: column; font-family: 'Geist', system-ui, sans-serif; }
-        header.ws-head { display: flex; align-items: center; gap: .5rem; padding: .6rem .9rem;
-            padding-top: calc(.6rem + env(safe-area-inset-top)); border-bottom: 1px solid #232733; background: #111319; }
-        .ws-title { font-weight: 600; font-size: .95rem; white-space: nowrap; }
-        select, input { font: inherit; font-size: .9rem; color: #EDEFF4; background: #12151C; border: 1px solid #2E3546;
-            border-radius: .6rem; padding: .45rem .6rem; min-width: 0; }
-        select { flex: 1; }
-        .btn { font: inherit; font-size: .85rem; padding: .45rem .8rem; border-radius: .6rem; border: 1px solid #2E3546;
-            background: #171A22; color: #EDEFF4; cursor: pointer; text-decoration: none; white-space: nowrap; }
-        .btn-primary { background: #F5BD5C; color: #15100A; border-color: #F5BD5C; font-weight: 600; }
-        .btn:disabled { opacity: .45; }
-        nav.tabs { display: flex; gap: .4rem; padding: .5rem .9rem; border-bottom: 1px solid #232733; background: #0E1015; }
-        nav.tabs button { font: inherit; font-size: .9rem; padding: .4rem .9rem; border-radius: .6rem; border: 1px solid transparent;
-            background: none; color: #9AA1B2; cursor: pointer; }
-        nav.tabs button.on { color: #15100A; background: #F5BD5C; }
-        main { flex: 1; min-height: 0; overflow: auto; padding: .8rem .9rem; padding-bottom: calc(.8rem + env(safe-area-inset-bottom)); }
-        .hidden { display: none !important; }
-        .crumbs { font: .82rem 'Geist Mono', ui-monospace, monospace; color: #9AA1B2; margin-bottom: .6rem; word-break: break-all; }
-        .crumbs button { background: none; border: 0; color: #F8D08C; font: inherit; cursor: pointer; padding: 0; }
-        .list { border: 1px solid #232733; border-radius: .7rem; overflow: hidden; }
-        .entry { display: flex; align-items: center; gap: .6rem; width: 100%; text-align: left; padding: .65rem .8rem;
-            background: #111319; border: 0; border-bottom: 1px solid #1B2030; color: #EDEFF4; font: inherit; font-size: .92rem; cursor: pointer; }
-        .entry:last-child { border-bottom: 0; }
-        .entry .kind { font: .7rem 'Geist Mono', monospace; color: #7DD3C0; width: 1.6rem; }
-        .entry.dir .kind { color: #F5BD5C; }
-        pre { font: .8rem/1.45 'Geist Mono', ui-monospace, monospace; white-space: pre-wrap; word-break: break-word;
-            background: #0B0C10; border: 1px solid #232733; border-radius: .7rem; padding: .7rem; margin: 0 0 .8rem; overflow: auto; }
-        h3 { font-size: .8rem; text-transform: uppercase; letter-spacing: .06em; color: #9AA1B2; margin: 1rem 0 .4rem; }
-        .msg { color: #9AA1B2; font-size: .9rem; line-height: 1.5; }
-        .toolbar { display: flex; gap: .5rem; align-items: center; margin-bottom: .7rem; }
-    </style>
+    <link rel="stylesheet" href="linux-look.css">
 </head>
 <body>
     <header class="ws-head">
         <a href="terminal.html" class="btn" aria-label="Back to terminal">&larr;</a>
         <span class="ws-title">Workspace</span>
         <select id="project" aria-label="Project"></select>
-        <a id="openTerm" class="btn" href="terminal.html">Terminal</a>
     </header>
 
-    <nav class="tabs">
-        <button id="tabFiles" class="on">Files</button>
-        <button id="tabGit">Git</button>
-    </nav>
 
     <main>
         <div id="unsupported" class="msg hidden">The workspace reads the Linux environment inside the Android app. It is not available in a web browser.</div>
@@ -78,6 +41,12 @@
             <div id="gitBody"></div>
         </section>
     </main>
+
+    <nav class="tabbar" aria-label="Linux sections">
+        <a id="openTerm" href="terminal.html">Terminal</a>
+        <button id="tabFiles" class="on">Files</button>
+        <button id="tabGit">Git</button>
+    </nav>
 
     <script src="vault.js"></script>
     <script src="github-import.js"></script>

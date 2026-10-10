@@ -253,6 +253,7 @@
             const preset = new URLSearchParams(location.search).get('project');
             const ok = await loadProjects(preset);
             if (ok) await loadDir(project);
+            if (location.hash === '#git') showTab('git');
         } catch (e) {
             el.empty.textContent = e.message || String(e);
             el.empty.classList.remove('hidden');

@@ -1,0 +1,284 @@
+/*
+ * Linux pages look (terminal, workspace).
+ *
+ * Layout and colour direction follow the AiCode Android app (GPL-3.0,
+ * https://github.com/jieapi/AiCode): dark graphite surfaces, a green accent,
+ * a pill-shaped state badge, and a bottom tab bar. The CSS here is written
+ * for this project; no AiCode stylesheet or asset is copied. See
+ * THIRD_PARTY_NOTICES.md.
+ */
+
+:root {
+    --lk-bg: #07111F;
+    --lk-surface: #0D1828;
+    --lk-surface-2: #132236;
+    --lk-input: #0A1421;
+    --lk-border: #1E2D42;
+    --lk-border-2: #2A3D57;
+    --lk-text: #F8FAFC;
+    --lk-text-2: #E2E8F0;
+    --lk-muted: #94A3B8;
+    --lk-dim: #64748B;
+    --lk-accent: #4ADE80;
+    --lk-accent-strong: #22C55E;
+    --lk-accent-ink: #052E16;
+    --lk-warn: #F59E0B;
+    --lk-danger: #EF4444;
+    --lk-danger-text: #F87171;
+    --lk-radius: .75rem;
+    --lk-radius-lg: 1rem;
+    --lk-font: 'Geist', system-ui, -apple-system, 'Segoe UI', sans-serif;
+    --lk-mono: 'Geist Mono', ui-monospace, 'SFMono-Regular', Menlo, monospace;
+}
+
+html, body {
+    height: 100%;
+    margin: 0;
+    background: var(--lk-bg);
+    color: var(--lk-text);
+}
+
+body {
+    display: flex;
+    flex-direction: column;
+    font-family: var(--lk-font);
+}
+
+/* Header */
+header.term-head,
+header.ws-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: .5rem;
+    padding: .6rem .9rem;
+    padding-top: calc(.6rem + env(safe-area-inset-top));
+    background: var(--lk-surface);
+    border-bottom: 1px solid var(--lk-border);
+}
+
+header.ws-head { justify-content: flex-start; }
+
+.term-title,
+.ws-title {
+    font-weight: 600;
+    font-size: .95rem;
+    white-space: nowrap;
+}
+
+/* State badge, styled like the reference's BUILD pill */
+.pill {
+    font-size: .72rem;
+    font-weight: 600;
+    letter-spacing: .04em;
+    text-transform: uppercase;
+    padding: .2rem .6rem;
+    border-radius: 999px;
+    border: 1px solid var(--lk-border-2);
+    color: var(--lk-muted);
+    white-space: nowrap;
+}
+.pill.ok { color: var(--lk-accent); border-color: rgba(74, 222, 128, .4); background: rgba(74, 222, 128, .08); }
+.pill.warn { color: var(--lk-warn); border-color: rgba(245, 158, 11, .4); }
+
+/* Buttons */
+.btn {
+    font: inherit;
+    font-size: .85rem;
+    padding: .5rem .85rem;
+    border-radius: var(--lk-radius);
+    border: 1px solid var(--lk-border-2);
+    background: var(--lk-surface-2);
+    color: var(--lk-text);
+    cursor: pointer;
+    text-decoration: none;
+    white-space: nowrap;
+}
+.btn:disabled { opacity: .45; cursor: default; }
+.btn-primary {
+    background: var(--lk-accent);
+    border-color: var(--lk-accent);
+    color: var(--lk-accent-ink);
+    font-weight: 600;
+}
+
+/* Inputs */
+input, select {
+    font: inherit;
+    font-size: .9rem;
+    color: var(--lk-text);
+    background: var(--lk-input);
+    border: 1px solid var(--lk-border-2);
+    border-radius: var(--lk-radius);
+    padding: .5rem .7rem;
+    min-width: 0;
+}
+
+/* Cards and lists */
+.card {
+    margin: 1rem;
+    padding: 1rem;
+    border: 1px solid var(--lk-border);
+    border-radius: var(--lk-radius-lg);
+    background: var(--lk-surface);
+}
+.card h2 { margin: 0 0 .35rem; font-size: 1rem; }
+.card p { margin: 0 0 .75rem; color: var(--lk-muted); font-size: .9rem; line-height: 1.45; }
+.bar { height: 6px; border-radius: 99px; background: var(--lk-surface-2); overflow: hidden; margin: .6rem 0; }
+.bar > div { height: 100%; width: 0; background: var(--lk-accent); transition: width .2s; }
+#error { color: var(--lk-danger-text); font-size: .85rem; margin-top: .5rem; white-space: pre-wrap; }
+.hidden { display: none !important; }
+
+/* Terminal */
+#term-wrap { flex: 1; min-height: 0; padding: .4rem .3rem .2rem .6rem; background: var(--lk-bg); }
+
+/* Terminal key row */
+#keys {
+    display: flex;
+    gap: .4rem;
+    overflow-x: auto;
+    padding: .45rem .5rem;
+    padding-bottom: .45rem;
+    border-top: 1px solid var(--lk-border);
+    background: var(--lk-surface);
+}
+#keys button {
+    font: inherit;
+    font-family: var(--lk-mono);
+    font-size: .8rem;
+    min-width: 2.6rem;
+    padding: .45rem .6rem;
+    border-radius: .55rem;
+    border: 1px solid var(--lk-border-2);
+    background: var(--lk-surface-2);
+    color: var(--lk-text-2);
+    cursor: pointer;
+}
+#keys button.on {
+    background: var(--lk-accent);
+    color: var(--lk-accent-ink);
+    border-color: var(--lk-accent);
+}
+
+/* Projects panel */
+#projects .row { display: flex; gap: .5rem; margin-bottom: .6rem; }
+#projects input { flex: 1; }
+#projects .list {
+    max-height: 36vh;
+    overflow: auto;
+    border: 1px solid var(--lk-border);
+    border-radius: var(--lk-radius);
+    margin-bottom: .6rem;
+}
+#projects .item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: .5rem;
+    padding: .55rem .7rem;
+    border-bottom: 1px solid var(--lk-border);
+    font-size: .9rem;
+}
+#projects .item small {
+    color: var(--lk-muted);
+    display: block;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+#projects .item > div { min-width: 0; }
+#projects .status {
+    white-space: pre-wrap;
+    font: .78rem/1.4 var(--lk-mono);
+    color: var(--lk-muted);
+    min-height: 1rem;
+}
+#projects.hidden { display: none; }
+#unsupported { margin: 1.5rem 1rem; color: var(--lk-muted); line-height: 1.5; }
+
+/* Workspace */
+main {
+    flex: 1;
+    min-height: 0;
+    overflow: auto;
+    padding: .8rem .9rem;
+}
+select { flex: 1; }
+.toolbar { display: flex; gap: .5rem; align-items: center; margin-bottom: .7rem; }
+.crumbs {
+    font: .82rem var(--lk-mono);
+    color: var(--lk-muted);
+    margin-bottom: .6rem;
+    word-break: break-all;
+}
+.crumbs button { background: none; border: 0; color: var(--lk-accent); font: inherit; cursor: pointer; padding: 0; }
+.list {
+    border: 1px solid var(--lk-border);
+    border-radius: var(--lk-radius);
+    overflow: hidden;
+}
+.entry {
+    display: flex;
+    align-items: center;
+    gap: .6rem;
+    width: 100%;
+    text-align: left;
+    padding: .65rem .8rem;
+    background: var(--lk-surface);
+    border: 0;
+    border-bottom: 1px solid var(--lk-border);
+    color: var(--lk-text);
+    font: inherit;
+    font-size: .92rem;
+    cursor: pointer;
+}
+.entry:last-child { border-bottom: 0; }
+.entry .kind { font: .7rem var(--lk-mono); color: var(--lk-dim); width: 1.6rem; }
+.entry.dir .kind { color: var(--lk-accent); }
+pre {
+    font: .8rem/1.45 var(--lk-mono);
+    white-space: pre-wrap;
+    word-break: break-word;
+    background: var(--lk-input);
+    border: 1px solid var(--lk-border);
+    border-radius: var(--lk-radius);
+    padding: .7rem;
+    margin: 0 0 .8rem;
+    overflow: auto;
+}
+h3 {
+    font-size: .8rem;
+    text-transform: uppercase;
+    letter-spacing: .06em;
+    color: var(--lk-muted);
+    margin: 1rem 0 .4rem;
+}
+.msg { color: var(--lk-muted); font-size: .9rem; line-height: 1.5; }
+
+/* Bottom tab bar (Terminal / Files / Git) */
+nav.tabbar {
+    display: flex;
+    gap: .35rem;
+    padding: .45rem .5rem;
+    padding-bottom: calc(.45rem + env(safe-area-inset-bottom));
+    background: var(--lk-surface);
+    border-top: 1px solid var(--lk-border);
+}
+nav.tabbar > * {
+    flex: 1;
+    font: inherit;
+    font-size: .88rem;
+    font-weight: 600;
+    text-align: center;
+    padding: .55rem .6rem;
+    border-radius: 999px;
+    border: 1px solid transparent;
+    background: none;
+    color: var(--lk-muted);
+    text-decoration: none;
+    cursor: pointer;
+}
+nav.tabbar > .on {
+    color: var(--lk-accent-ink);
+    background: var(--lk-accent);
+}

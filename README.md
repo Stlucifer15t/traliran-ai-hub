@@ -153,3 +153,7 @@ This project is licensed under the **GNU Affero General Public License v3.0 (AGP
 3.  **No Hidden Commercialization:** You cannot close the source code or hide integrated core features (including the store and author credits) in public deployments.
 
 *For custom commercial licensing or private white-label partnerships without AGPLv3 restrictions, please contact the repository maintainer via email: cwcom@proton.me.*
+
+## Linux pages look (AiCode direction)
+
+The Linux terminal and workspace pages now follow the look of the AiCode Android app (GPL-3.0): dark graphite surfaces, a green accent, a state badge, and a bottom tab bar (Terminal / Files / Git). The styles are in `linux-look.css`; no AiCode asset is copied. Credits and licence notes are in `THIRD_PARTY_NOTICES.md`.

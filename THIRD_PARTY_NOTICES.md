@@ -1,0 +1,33 @@
+# Third-party notices
+
+This project reuses ideas, layout and some code from other open-source projects.
+Each entry below names the source, its licence, and what was taken.
+
+## AiCode (jieapi/AiCode)
+
+- Source: https://github.com/jieapi/AiCode
+- Copyright: the AiCode authors (see the upstream repository for the full list)
+- Licence: GNU General Public License v3.0 (GPL-3.0), full text at https://github.com/jieapi/AiCode/blob/main/LICENSE
+- What is reused:
+  - Visual direction for the Linux pages (dark graphite surfaces, green accent,
+    state badge, bottom tab bar). Implemented in `linux-look.css`. No stylesheet
+    or image asset is copied.
+  - Feature direction for the Linux workspace (agent modes, checkpoints, skills,
+    memory, sub-agents, Git view). Ported feature by feature, each change noted
+    in the commit message.
+
+When code is copied verbatim from AiCode, the copied file keeps its original
+copyright header and is listed here with its path.
+
+## Termux and PRoot (via AiCode)
+
+AiCode itself builds on Termux (terminal components, GPL/Apache licences
+depending on the file) and PRoot. Any file copied from those projects keeps its
+original header and is listed here.
+
+## This project
+
+Traliran AI Hub is licensed under AGPL-3.0 (see `LICENSE`). GPL-3.0 and AGPL-3.0
+are designed to be compatible, so GPL-3.0 material from AiCode can be combined
+into this AGPL-3.0 project. This is our reading of the licences, not legal
+advice. Copyright notices of copied material are kept with it.
