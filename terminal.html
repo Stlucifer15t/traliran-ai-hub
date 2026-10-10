@@ -1,0 +1,95 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <meta name="theme-color" content="#0B0C10">
+    <title>Linux Terminal - Traliran AI Hub</title>
+    <link rel="stylesheet" href="vendor/xterm/xterm.css">
+    <link rel="stylesheet" href="vendor/tailwind.css">
+    <link rel="stylesheet" href="theme-palette.css">
+    <link rel="stylesheet" href="styles.css">
+    <style>
+        html, body { height: 100%; margin: 0; background: #0B0C10; color: #EDEFF4; }
+        body { display: flex; flex-direction: column; font-family: 'Geist', system-ui, sans-serif; }
+        header.term-head {
+            display: flex; align-items: center; justify-content: space-between; gap: .5rem;
+            padding: .6rem .9rem; border-bottom: 1px solid #232733; background: #111319;
+            padding-top: calc(.6rem + env(safe-area-inset-top));
+        }
+        .term-title { font-weight: 600; font-size: .95rem; }
+        .pill { font-size: .72rem; padding: .2rem .55rem; border-radius: 999px; border: 1px solid #2E3546; color: #9AA1B2; white-space: nowrap; }
+        .pill.ok { color: #7DD3C0; border-color: rgba(125,211,192,.35); }
+        .pill.warn { color: #F5BD5C; border-color: rgba(245,189,92,.35); }
+        .btn { font: inherit; font-size: .85rem; padding: .5rem .85rem; border-radius: .6rem; border: 1px solid #2E3546; background: #171A22; color: #EDEFF4; cursor: pointer; }
+        .btn:disabled { opacity: .45; cursor: default; }
+        .btn-primary { background: #F5BD5C; color: #15100A; border-color: #F5BD5C; font-weight: 600; }
+        .card { margin: 1rem; padding: 1rem; border: 1px solid #232733; border-radius: .875rem; background: #111319; }
+        .card h2 { margin: 0 0 .35rem; font-size: 1rem; }
+        .card p { margin: 0 0 .75rem; color: #9AA1B2; font-size: .9rem; line-height: 1.45; }
+        .bar { height: 6px; border-radius: 99px; background: #1B2030; overflow: hidden; margin: .6rem 0; }
+        .bar > div { height: 100%; width: 0; background: #F5BD5C; transition: width .2s; }
+        #error { color: #F5A3A3; font-size: .85rem; margin-top: .5rem; white-space: pre-wrap; }
+        #term-wrap { flex: 1; min-height: 0; padding: .4rem .3rem .2rem .6rem; }
+        #term-wrap.hidden, .card.hidden, #keys.hidden { display: none; }
+        #keys {
+            display: flex; gap: .4rem; overflow-x: auto; padding: .4rem .5rem;
+            padding-bottom: calc(.4rem + env(safe-area-inset-bottom));
+            border-top: 1px solid #232733; background: #111319;
+        }
+        #keys button {
+            font: inherit; font-family: 'Geist Mono', ui-monospace, monospace; font-size: .8rem;
+            min-width: 2.6rem; padding: .45rem .6rem; border-radius: .5rem;
+            border: 1px solid #2E3546; background: #171A22; color: #EDEFF4; cursor: pointer;
+        }
+        #keys button.on { background: #F5BD5C; color: #15100A; border-color: #F5BD5C; }
+        #unsupported { margin: 1.5rem 1rem; color: #9AA1B2; line-height: 1.5; }
+    </style>
+</head>
+<body>
+    <header class="term-head">
+        <div style="display:flex;align-items:center;gap:.6rem;min-width:0">
+            <a href="index.html" class="btn" style="padding:.35rem .6rem" aria-label="Back">&larr;</a>
+            <span class="term-title">Linux Terminal</span>
+            <span id="state" class="pill">checking</span>
+        </div>
+        <div style="display:flex;gap:.4rem">
+            <button id="restartBtn" class="btn" hidden>New shell</button>
+            <button id="stopBtn" class="btn" hidden>Stop</button>
+        </div>
+    </header>
+
+    <div id="unsupported" hidden>
+        The Linux terminal runs in the Android app. It is not available in a web browser.
+    </div>
+
+    <section id="setup" class="card hidden">
+        <h2>Install Linux</h2>
+        <p>Downloads a minimal Alpine Linux root filesystem (about 4 MB) into the app's private storage. Packages come from the Alpine mirror with <code>apk</code> when you need them.</p>
+        <button id="installBtn" class="btn btn-primary">Install</button>
+        <div class="bar" id="barWrap" hidden><div id="bar"></div></div>
+        <div id="stage" style="color:#9AA1B2;font-size:.85rem"></div>
+        <div id="error"></div>
+    </section>
+
+    <div id="term-wrap" class="hidden"></div>
+
+    <div id="keys" class="hidden" aria-label="Terminal keys">
+        <button data-key="esc">Esc</button>
+        <button data-key="tab">Tab</button>
+        <button id="ctrlBtn" data-key="ctrl">Ctrl</button>
+        <button data-key="left">&larr;</button>
+        <button data-key="up">&uarr;</button>
+        <button data-key="down">&darr;</button>
+        <button data-key="right">&rarr;</button>
+        <button data-key="pipe">|</button>
+        <button data-key="tilde">~</button>
+        <button data-key="slash">/</button>
+        <button data-key="dash">-</button>
+    </div>
+
+    <script src="vendor/xterm/xterm.js"></script>
+    <script src="vendor/xterm/addon-fit.js"></script>
+    <script src="terminal.js"></script>
+</body>
+</html>
