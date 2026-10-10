@@ -174,6 +174,6 @@ Sub-agents: the agent can call spawn_subagent(agent, task). The sub-agent runs i
 The Linux terminal has a **Images** button. It opens a Container & images panel:
 
 - **Installed** lists the images on the device. The active one runs in the next shell. Switching stops the current shell. Built-in images cannot be deleted, and neither can the active image.
-- **Download** lists Alpine 3.21 to 3.24, Ubuntu 20.04, 22.04 and 24.04, and Debian 12 and 13. Debian is listed but disabled until a checksum source for its download host is verified. The installer already reads `.tar.xz` archives.
+- **Download** lists Alpine 3.21 to 3.24, Ubuntu 20.04, 22.04 and 24.04, and Debian 12 and 13. Debian 12 and 13 come from the Debian official-images build, and each one is checked against its published `.sha256`. The installer reads `.tar.xz` archives. Debian is the only image that uses xz.
 
-Each image is stored in its own folder under the app's private storage. Downloads come only from `dl-cdn.alpinelinux.org` and `cdimage.ubuntu.com`, over https, and each one must match its published SHA-256 checksum before it is unpacked. The image list follows AiCode (GPL-3.0). See `THIRD_PARTY_NOTICES.md`.
+Each image is stored in its own folder under the app's private storage. Downloads come only from `dl-cdn.alpinelinux.org`, `cdimage.ubuntu.com` and `doi-janky.infosiftr.net` (Debian), over https, and each one must match its published SHA-256 checksum before it is unpacked. The image list follows AiCode (GPL-3.0). See `THIRD_PARTY_NOTICES.md`.

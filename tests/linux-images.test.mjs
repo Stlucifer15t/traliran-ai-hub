@@ -13,7 +13,7 @@ vm.createContext(ctx);
 vm.runInContext(src, ctx);
 const L = ctx.LinuxImages;
 
-const ALLOWED = ['dl-cdn.alpinelinux.org', 'cdimage.ubuntu.com'];
+const ALLOWED = ['dl-cdn.alpinelinux.org', 'cdimage.ubuntu.com', 'doi-janky.infosiftr.net'];
 
 test('catalog has the built-in image first and unique ids', () => {
     assert.equal(L.CATALOG[0].id, 'builtin');
@@ -29,7 +29,7 @@ test('every downloadable image uses https from an allowed host and has a checksu
         assert.equal(c.protocol, 'https:', img.id);
         assert.ok(ALLOWED.includes(u.host), img.id + ' tarball host');
         assert.ok(ALLOWED.includes(c.host), img.id + ' checksum host');
-        assert.ok(img.tarballUrl.endsWith('-arm64.tar.gz') || img.tarballUrl.endsWith('-aarch64.tar.gz'), img.id);
+        assert.ok(/-(arm64|aarch64)\.tar\.gz$|\/rootfs\.tar\.xz$/.test(img.tarballUrl), img.id);
     }
 });
 
@@ -46,13 +46,17 @@ test('Alpine images use a one-hash sidecar; Ubuntu images use a listed SHA256SUM
     }
 });
 
-test('Debian is listed but disabled until its checksum source is verified', () => {
+test('Debian 12 and 13 use a one-hash .sha256 sidecar next to rootfs.tar.xz', () => {
     const deb = L.CATALOG.filter(i => i.distro === 'debian');
-    assert.ok(deb.length >= 1);
+    assert.deepEqual(JSON.parse(JSON.stringify(deb.map(i => i.id))), ['debian-12', 'debian-13']);
     for (const img of deb) {
-        assert.equal(img.supported, false);
-        assert.throws(() => L.installArgs(img), /not verified/);
+        assert.equal(img.supported, true, img.id);
+        assert.ok(img.tarballUrl.endsWith('/rootfs.tar.xz'), img.id);
+        assert.equal(img.checksumUrl, img.tarballUrl + '.sha256', img.id);
+        assert.equal(img.checksumListed, false, img.id);
+        assert.equal(img.apkBranch, '', 'Debian has no apk');
     }
+    assert.notEqual(L.find('debian-12').tarballUrl, L.find('debian-13').tarballUrl);
 });
 
 test('installArgs: built-in takes only its id; others carry the download addresses', () => {

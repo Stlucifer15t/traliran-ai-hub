@@ -59,7 +59,8 @@
         };
     }
 
-    function debian(version, description) {
+    function debian(series, version, description) {
+        const dir = `https://doi-janky.infosiftr.net/job/tianon/job/debuerreotype/job/arm64v8/lastSuccessfulBuild/artifact/${series}/`;
         return {
             id: 'debian-' + version.split(' ')[0],
             name: 'Debian',
@@ -67,8 +68,11 @@
             description,
             distro: 'debian',
             sizeMB: 29,
-            supported: false,
-            unsupportedReason: 'Checksum source not verified yet.',
+            supported: true,
+            tarballUrl: dir + 'rootfs.tar.xz',
+            checksumUrl: dir + 'rootfs.tar.xz.sha256',
+            checksumListed: false,
+            apkBranch: '',
         };
     }
 
@@ -81,8 +85,8 @@
         ubuntu('20.04', '20.04.5', 'Ubuntu 20.04 LTS (Focal) base system. Uses apt, not apk.'),
         ubuntu('22.04', '22.04.5', 'Ubuntu 22.04 LTS (Jammy) base system. Uses apt, not apk.'),
         ubuntu('24.04', '24.04.4', 'Ubuntu 24.04 LTS (Noble) base system. Uses apt, not apk.'),
-        debian('12 (bookworm)', 'Debian 12 stable base system. Uses apt.'),
-        debian('13 (trixie)', 'Debian 13 current stable base system. Uses apt.'),
+        debian('bookworm', '12 (bookworm)', 'Debian 12 stable base system. Uses apt.'),
+        debian('trixie', '13 (trixie)', 'Debian 13 current stable base system. Uses apt.'),
     ];
 
     function find(id) {

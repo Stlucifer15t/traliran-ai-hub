@@ -56,7 +56,8 @@ final class RootfsInstaller {
     static final String TARBALL = "alpine-minirootfs-" + VERSION + "-aarch64.tar.gz";
 
     /** Hosts an image may be downloaded from. Anything else is refused. */
-    static final List<String> ALLOWED_HOSTS = Arrays.asList("dl-cdn.alpinelinux.org", "cdimage.ubuntu.com");
+    static final List<String> ALLOWED_HOSTS = Arrays.asList(
+            "dl-cdn.alpinelinux.org", "cdimage.ubuntu.com", "doi-janky.infosiftr.net");
     private static final Pattern IMAGE_ID = Pattern.compile("[a-z0-9][a-z0-9.-]{0,39}");
 
     /**
@@ -195,7 +196,8 @@ final class RootfsInstaller {
         //noinspection ResultOfMethodCallIgnored
         downloads.mkdirs();
         String fileName = src.fileName();
-        File tarball = new File(downloads, fileName);
+        // Prefix with the image id: Debian 12 and 13 both end in rootfs.tar.xz.
+        File tarball = new File(downloads, src.id + "-" + fileName);
 
         progress.update("checksum", 0);
         String expected = fetchChecksum(src.checksumUrl, src.checksumListed, fileName);

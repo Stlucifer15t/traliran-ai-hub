@@ -46,3 +46,10 @@ advice. Copyright notices of copied material are kept with it.
 
 - Used by the Android app to unpack `.tar.xz` rootfs archives (Debian).
 - Licence: public domain (see https://tukaani.org/xz/java.html).
+
+## Debian root filesystems
+
+- Debian 12 (bookworm) and 13 (trixie) rootfs archives are downloaded from the Debian
+  official-images build host (`doi-janky.infosiftr.net`), as listed in AiCode's
+  `container-images.json`. Each archive is checked against the `.sha256` file published
+  next to it. Debian is free software; its licences apply to the archive contents.
