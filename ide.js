@@ -1281,7 +1281,7 @@ Be helpful, precise, and professional. All communication must be in English.`;
         }).join('\n\n');
 
         // Add tool instructions to system message
-        const systemPrompt = (opts.planOnly ? AgentExtras.PLAN_PROMPT + '\n\n' : '') + `You are an AI assistant in a code IDE. You can use the following tools to interact with the file system and editor:
+        const systemPrompt = (window.AgentModes ? window.AgentModes.promptNote() + '\n\n' : '') + (opts.planOnly ? AgentExtras.PLAN_PROMPT + '\n\n' : '') + `You are an AI assistant in a code IDE. You can use the following tools to interact with the file system and editor:
 
 ${toolDescriptions}
 
@@ -1354,7 +1354,8 @@ If no tool is needed, just respond normally with your answer.`;
                         args = {};
                     }
 
-                    const result = await tool.execute(args);
+                    const blocked = window.AgentModes ? window.AgentModes.gate(toolCall.function.name) : null;
+                    const result = blocked !== null ? blocked : await tool.execute(args);
                     
                     // Add tool result to messages as a user message with context
                     // We use 'user' role instead of 'tool' to avoid API errors when tools aren't defined

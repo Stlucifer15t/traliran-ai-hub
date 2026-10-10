@@ -53,7 +53,7 @@
     /**
      * Shows the approval card in the chat. Returns { approved: Promise<boolean>, showResult, showError }.
      */
-    function requestApproval(command, cwd) {
+    function requestApproval(command, cwd, autoRun) {
         const win = typeof agentChatWindow !== 'undefined' ? agentChatWindow : null;
         let resolve;
         const approved = new Promise((r) => { resolve = r; });
@@ -83,6 +83,10 @@
         card.appendChild(buttons);
         const status = el('div', 'text-xs text-gray-400');
         card.appendChild(status);
+        if (autoRun) {
+            decided('Auto mode: running without asking.');
+            settle(true);
+        }
 
         function setStatus(text) {
             status.textContent = text;
@@ -161,7 +165,8 @@
                 return json({ success: false, error: 'Linux is not installed. The user can install it from the Terminal page.' });
             }
 
-            const request = requestApproval(command, cwd);
+            const autoRun = !!(g.AgentModes && g.AgentModes.autoApprove());
+            const request = requestApproval(command, cwd, autoRun);
             const ok = await request.approved;
             if (!ok) {
                 return json({ success: false, denied: true, error: 'The user did not approve this command. Do not retry it without asking.' });

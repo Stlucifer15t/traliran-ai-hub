@@ -818,3 +818,12 @@ input::placeholder, textarea::placeholder { color: #666E80; }
 .input-bar .input-field:focus { outline: none; }
 .input-bar .input-field::placeholder { color: var(--ink-faint); }
 .input-bar:focus-within { border-color: var(--accent-color); }
+
+/* Agent mode pill (Build / Plan / Auto). Colour follows the mode. */
+.agent-mode-btn {
+    font: inherit; font-size: .72rem; font-weight: 700; letter-spacing: .05em; text-transform: uppercase;
+    padding: .2rem .65rem; border-radius: 999px; cursor: pointer;
+    border: 1px solid rgba(74, 222, 128, .45); background: rgba(74, 222, 128, .1); color: var(--accent-color);
+}
+.agent-mode-btn[data-mode="PLAN"] { border-color: rgba(125, 211, 192, .45); background: rgba(125, 211, 192, .1); color: #7DD3C0; }
+.agent-mode-btn[data-mode="AUTO"] { border-color: rgba(245, 158, 11, .5); background: rgba(245, 158, 11, .1); color: #FBBF24; }
