@@ -31,6 +31,17 @@ jobs:
       - name: Build web bundle and sync Capacitor
         run: npm run cap:sync
 
+      - name: Build the PTY helper (native, arm64) into jniLibs
+        run: |
+          set -euo pipefail
+          NDK_BIN="$ANDROID_NDK_HOME/toolchains/llvm/prebuilt/linux-x86_64/bin"
+          DEST=android/app/src/main/jniLibs/arm64-v8a
+          mkdir -p "$DEST"
+          "$NDK_BIN/aarch64-linux-android24-clang" -shared -fPIC -O2 -Wall \
+            -o "$DEST/libptyhelper.so" native/ptyhelper/pty_jni.c
+          "$NDK_BIN/llvm-strip" --strip-unneeded "$DEST/libptyhelper.so"
+          ls -la "$DEST"
+
       - name: Build debug APK
         working-directory: android
         env:
